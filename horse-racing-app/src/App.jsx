@@ -7,7 +7,11 @@ import Login from './components/Login';
 import './App.css';
 
 //import PaymentModal from './components/PaymentModal';
-//import { betService } from './services/betService';
+//
+
+
+
+import { betService } from './services/betService';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -49,6 +53,8 @@ function App() {
         potentialWin
       });
 
+
+      "juaaaaaaaaaaaaaaaaaaaaaaan"
       // Preparar datos para el pago
       setBetData({
         ...data,
