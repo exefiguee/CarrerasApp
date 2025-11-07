@@ -259,38 +259,122 @@ const RacesList = ({ onSelectRace }) => {
           </div>
         </div>
       </div>
-
       {/* 🔸 LISTA DE CARRERAS INFERIOR */}
       <div className="h-72 bg-slate-900 border-t border-slate-800 overflow-y-auto">
-        <div className="p-5 bg-slate-800/50 border-b border-slate-700/50">
-          <h2 className="font-bold text-lg text-white flex items-center gap-2">
-            🏇 Carreras en{" "}
-            {getHipodromoInfo(selectedHipodromo)?.descripcion || "Hipódromo"}
-          </h2>
+        {/* Encabezado de la sección */}
+        <div className="p-5 bg-slate-800/50 border-b border-slate-700/50 backdrop-blur-sm sticky top-0 z-10">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+              <span className="text-xl">🏇</span>
+            </div>
+            <div>
+              <h2 className="font-bold text-lg text-white">
+                {getHipodromoInfo(selectedHipodromo)?.descripcion ||
+                  "Hipódromo"}
+              </h2>
+              <p className="text-xs text-slate-400">
+                {carrerasDelHipodromo.length} carreras programadas
+              </p>
+            </div>
+          </div>
         </div>
 
+        {/* 🔸 LISTA DE CARRERAS */}
         {carrerasDelHipodromo.length === 0 ? (
-          <div className="text-center text-slate-400 p-10">
-            No hay carreras disponibles
+          <div className="flex items-center justify-center h-56 text-slate-500">
+            <div className="text-center">
+              <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-4 shadow-inner shadow-slate-700">
+                <span className="text-4xl">🏇</span>
+              </div>
+              <p className="text-lg font-semibold text-slate-300">
+                No hay carreras disponibles
+              </p>
+              <p className="text-sm text-slate-500 mt-1">
+                Selecciona otro hipódromo
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 p-6">
             {carrerasDelHipodromo.map((carrera) => {
               const isSelected = selectedCarrera?.id === carrera.id;
               return (
                 <button
                   key={carrera.id}
                   onClick={() => handleSelectCarrera(carrera)}
-                  className={`p-5 rounded-xl transition-all ${
-                    isSelected
-                      ? "bg-gradient-to-br from-emerald-600 to-emerald-500 text-white scale-105"
-                      : "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                  }`}>
-                  <div className="font-semibold">
-                    Carrera {carrera.num_carrera}
+                  className={`group relative text-left p-5 rounded-2xl transition-all duration-300 border backdrop-blur-sm overflow-hidden
+            ${
+              isSelected
+                ? "bg-gradient-to-br from-slate-600/80 to-slate-500/80 border-red-400/30 shadow-lg shadow-red-500/30 scale-105"
+                : "bg-slate-900/70 border-slate-700 hover:bg-slate-800/80 hover:border-emerald-400/20 hover:shadow-md hover:shadow-emerald-500/10"
+            }`}>
+                  {/* 🔹 Efecto de brillo al seleccionar */}
+                  {isSelected && (
+                    <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none" />
+                  )}
+
+                  {/* Encabezado */}
+                  <div className="flex items-center justify-between mb-3">
+                    <span
+                      className={`px-4 py-1.5 rounded-lg text-sm font-bold tracking-wide transition-colors
+                ${
+                  isSelected
+                    ? "bg-white/20 text-white"
+                    : "bg-emerald-500/10 text-emerald-400 border border-emerald-400/20 group-hover:bg-emerald-500/20"
+                }`}>
+                      Carrera {carrera.num_carrera}
+                    </span>
+                    <div
+                      className={`flex items-center gap-1.5 text-sm font-semibold transition-colors
+                ${
+                  isSelected
+                    ? "text-white"
+                    : "text-slate-400 group-hover:text-slate-300"
+                }`}>
+                      <span>🕐</span>
+                      <span>{carrera.hora}</span>
+                    </div>
                   </div>
-                  <div className="text-sm">🕐 {carrera.hora}</div>
-                  <div className="text-sm">👥 {carrera.caballos} caballos</div>
+
+                  {/* Contenido principal */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={
+                          isSelected ? "text-white" : "text-emerald-400"
+                        }>
+                        👥
+                      </span>
+                      <span
+                        className={`text-sm font-medium ${
+                          isSelected ? "text-white" : "text-slate-300"
+                        }`}>
+                        {carrera.caballos} caballos
+                      </span>
+                    </div>
+
+                    <div
+                      className={`text-sm ${
+                        isSelected ? "text-white/90" : "text-slate-400"
+                      }`}>
+                      📅 {carrera.fecha}
+                    </div>
+
+                    <div
+                      className={`text-sm font-semibold ${
+                        isSelected ? "text-yellow-300" : "text-emerald-400"
+                      }`}>
+                      💰 {parseFloat(carrera.monto_vale).toLocaleString()} USD
+                    </div>
+                  </div>
+
+                  {/* 🔹 Sombra decorativa */}
+                  <div
+                    className={`absolute inset-0 rounded-2xl transition-all duration-500 ${
+                      isSelected
+                        ? "shadow-[0_0_25px_2px_rgba(239,68,68,0.4)]"
+                        : "group-hover:shadow-[0_0_20px_1px_rgba(16,185,129,0.2)]"
+                    }`}></div>
                 </button>
               );
             })}
