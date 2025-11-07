@@ -1,17 +1,13 @@
-import { useState, useEffect } from 'react';
-import { auth } from './firebase/config';
-import { onAuthStateChanged } from 'firebase/auth';
-import RacesList from './components/RacesList';
-import BetModal from './components/BetModal';
-import Login from './components/Login';
-import './App.css';
+import { useState, useEffect } from "react";
+import { auth } from "./firebase/config";
+import { onAuthStateChanged } from "firebase/auth";
+import RacesList from "./components/RacesList";
+import BetModal from "./components/BetModal";
+import Login from "./components/Login";
+import "./App.css";
 
 //import PaymentModal from './components/PaymentModal';
-//
-
-
-
-import { betService } from './services/betService';
+// import { betService } from './services/betService';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -35,7 +31,7 @@ function App() {
 
   const handleConfirmBet = async (data) => {
     if (!user) {
-      alert('Debes iniciar sesión para apostar');
+      alert("Debes iniciar sesión para apostar");
       return;
     }
 
@@ -50,17 +46,15 @@ function App() {
     try {
       const bet = await betService.createBet(user.uid, {
         ...data,
-        potentialWin
+        potentialWin,
       });
 
-
-      "juaaaaaaaaaaaaaaaaaaaaaaan"
       // Preparar datos para el pago
       setBetData({
         ...data,
         betId: bet.id,
         userId: user.uid,
-        potentialWin
+        potentialWin,
       });
 
       // Cerrar modal de apuesta
@@ -69,21 +63,29 @@ function App() {
       // Abrir modal de pago
       setShowPaymentModal(true);
     } catch (error) {
-      console.error('Error creating bet:', error);
-      alert('Error al crear la apuesta. Intentá nuevamente.');
+      console.error("Error creating bet:", error);
+      alert("Error al crear la apuesta. Intentá nuevamente.");
     }
   };
 
   const handlePaymentComplete = () => {
     setShowPaymentModal(false);
     setBetData(null);
-    alert('¡Pago procesado! Recibirás un email de confirmación.');
+    alert("¡Pago procesado! Recibirás un email de confirmación.");
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="text-center">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-slate-700 border-t-emerald-500 mx-auto mb-6"></div>
+            <div className="absolute inset-0 rounded-full h-20 w-20 border-4 border-emerald-500/20 mx-auto blur-sm"></div>
+          </div>
+          <p className="text-slate-300 text-xl font-semibold">
+            Cargando sistema...
+          </p>
+        </div>
       </div>
     );
   }
@@ -93,21 +95,27 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-secondary text-white shadow-lg">
-        <div className="container mx-auto px-4 py-4">
+    <div className="h-screen flex flex-col overflow-hidden">
+      {/* Header Compacto */}
+      <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700/50 shadow-2xl flex-shrink-0">
+        <div className="px-6 py-3">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold">🏇 Horse Racing Bet</h1>
-              <p className="text-sm text-gray-300">Carreras de Argentina</p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                <span className="text-xl">🏇</span>
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-white">
+                  Horse Racing Bet
+                </h1>
+                <p className="text-xs text-slate-400">Carreras de Argentina</p>
+              </div>
             </div>
             <div className="text-right">
-              <p className="text-sm">👤 {user.email}</p>
+              <p className="text-sm text-slate-300">👤 {user.email}</p>
               <button
                 onClick={() => auth.signOut()}
-                className="text-xs text-red-400 hover:text-red-300"
-              >
+                className="text-xs text-red-400 hover:text-red-300 transition-colors">
                 Cerrar sesión
               </button>
             </div>
@@ -115,8 +123,8 @@ function App() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      {/* Main Content - Sin padding, ocupando todo el espacio */}
+      <main className="flex-1 overflow-y-auto bg-slate-900">
         <RacesList onSelectRace={handleSelectRace} />
       </main>
 
@@ -136,16 +144,6 @@ function App() {
           onPaymentComplete={handlePaymentComplete}
         />
       )}
-
-      {/* Footer */}
-      <footer className="bg-secondary text-white text-center py-4 mt-12">
-        <p className="text-sm">
-          © 2025 Horse Racing Bet - Apuestas responsables 🎲
-        </p>
-        <p className="text-xs text-gray-400 mt-1">
-          Prohibido para menores de 18 años
-        </p>
-      </footer>
     </div>
   );
 }
