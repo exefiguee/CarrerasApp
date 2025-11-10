@@ -34,8 +34,12 @@ const HorseSelector = ({
       // Deseleccionar
       onSelect(selectedHorses.filter((h) => h.number !== horse.number));
     } else if (selectedHorses.length < betTypeConfig.maxHorses) {
-      // Seleccionar si no se alcanzó el máximo
-      onSelect([...selectedHorses, horse]);
+      // ✅ Asegurar que se guarden correctamente number y name
+      const horseToAdd = {
+        number: horse.number,
+        name: horse.name || `CABALLO ${horse.number}`,
+      };
+      onSelect([...selectedHorses, horseToAdd]);
     }
   };
 
@@ -75,7 +79,7 @@ const HorseSelector = ({
 
             return (
               <div
-                key={`${horse.number}-${index}`} // ✅ key única
+                key={`horse-${horse.number}-${index}`}
                 onClick={() => handleHorseClick(horse)}
                 className={`grid grid-cols-12 gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
                   selected
@@ -97,7 +101,9 @@ const HorseSelector = ({
                 {/* Info del caballo */}
                 <div className="col-span-8 flex flex-col justify-center">
                   <div className="font-bold text-gray-800">{horse.name}</div>
-                  <div className="text-xs text-gray-600">{horse.jockey}</div>
+                  {horse.jockey && (
+                    <div className="text-xs text-gray-600">{horse.jockey}</div>
+                  )}
                 </div>
 
                 {/* Checkbox */}
@@ -125,7 +131,7 @@ const HorseSelector = ({
           <div className="flex flex-wrap gap-2">
             {selectedHorses.map((horse, index) => (
               <span
-                key={`${horse.number}-selected`} // ✅ key única
+                key={`selected-${horse.number}-${index}`}
                 className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm">
                 {index + 1}° → #{horse.number} {horse.name}
               </span>

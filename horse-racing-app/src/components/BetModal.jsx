@@ -1,23 +1,24 @@
-import { useState } from 'react';
-import BetTypeSelector from './BetTypeSelector';
-import HorseSelector from './HorseSelector';
-import BetAmount from './BetAmount';
+import { useState } from "react";
+import BetTypeSelector from "./BetTypeSelector";
+import HorseSelector from "./HorseSelector";
+import BetAmount from "./BetAmount";
 
-const BetModal = ({ race, onClose, onConfirmBet }) => {
+const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
   const [step, setStep] = useState(1); // 1: tipo, 2: caballos, 3: monto
   const [betType, setBetType] = useState(null);
   const [selectedHorses, setSelectedHorses] = useState([]);
+  const [selectedRace, selected] = useState([]);
   const [amount, setAmount] = useState(0);
 
   const betTypes = {
-    GANADOR: { label: 'GANADOR', maxHorses: 1, minHorses: 1 },
-    SEGUNDO: { label: 'SEGUNDO', maxHorses: 1, minHorses: 1 },
-    TERCERO: { label: 'TERCERO', maxHorses: 1, minHorses: 1 },
-    EXACTA: { label: 'EXACTA', maxHorses: 2, minHorses: 2 },
-    'TRIFECTA_D': { label: 'TRIFECTA D', maxHorses: 1, minHorses: 1 },
-    'TIRA_1_2': { label: 'TIRA(1,2)', maxHorses: 2, minHorses: 2 },
-    'TIRA_1_2_3': { label: 'TIRA(1,2,3)', maxHorses: 3, minHorses: 3 },
-    'TRIFECTA_C': { label: 'TRIFECTA C', maxHorses: 3, minHorses: 3 }
+    GANADOR: { label: "GANADOR", maxHorses: 1, minHorses: 1 },
+    SEGUNDO: { label: "SEGUNDO", maxHorses: 1, minHorses: 1 },
+    TERCERO: { label: "TERCERO", maxHorses: 1, minHorses: 1 },
+    EXACTA: { label: "EXACTA", maxHorses: 2, minHorses: 2 },
+    TRIFECTA_D: { label: "TRIFECTA D", maxHorses: 1, minHorses: 1 },
+    TIRA_1_2: { label: "TIRA(1,2)", maxHorses: 2, minHorses: 2 },
+    TIRA_1_2_3: { label: "TIRA(1,2,3)", maxHorses: 3, minHorses: 3 },
+    TRIFECTA_C: { label: "TRIFECTA C", maxHorses: 3, minHorses: 3 },
   };
 
   const handleBetTypeSelect = (type) => {
@@ -32,26 +33,20 @@ const BetModal = ({ race, onClose, onConfirmBet }) => {
   };
 
   const handleConfirmBet = () => {
-    const betData = {
-      raceId: race.id,
-      raceName: `${race.venue} - Carrera ${race.raceNumber}`,
-      venue: race.venue,
-      raceNumber: race.raceNumber,
-      betType: betType,
-      selections: selectedHorses,
-      amount: amount
-    };
-    onConfirmBet(betData);
+    // Cerrar el modal después de confirmar
+    onClose();
   };
 
   const canProceed = () => {
     if (step === 2) {
       const config = betTypes[betType];
-      return selectedHorses.length >= config.minHorses && 
-             selectedHorses.length <= config.maxHorses;
+      return (
+        selectedHorses.length >= config.minHorses &&
+        selectedHorses.length <= config.maxHorses
+      );
     }
     if (step === 3) {
-      return amount >= 200 && amount <= 50000;
+      return amount >= 200 && amount <= 50000 && amount <= (userSaldo || 0);
     }
     return true;
   };
@@ -63,25 +58,25 @@ const BetModal = ({ race, onClose, onConfirmBet }) => {
         <div className="bg-primary text-white p-4 sticky top-0 z-10">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">
-              {step === 1 && 'SELECCIÓN DE APUESTA'}
+              {step === 1 && "SELECCIÓN DE APUESTA"}
               {step === 2 && `APUESTA A: ${betTypes[betType]?.label}`}
               {step === 3 && `APUESTA A: ${betTypes[betType]?.label}`}
             </h2>
-            <button 
-              onClick={onClose}
-              className="text-2xl hover:text-gray-200"
-            >
+            <button onClick={onClose} className="text-2xl hover:text-gray-200">
               ×
             </button>
           </div>
-          
+
           <div className="mt-2 text-sm">
             <div className="flex items-center space-x-2">
               <span>🇦🇷</span>
-              <span className="font-semibold">{race.venue}</span>
+              <span className="font-semibold">
+                {race.venue || race.descripcion_hipodromo}
+              </span>
             </div>
             <div className="text-xs opacity-90">
-              Carrera {race.raceNumber} | {race.date} - {race.time}
+              Carrera {race.raceNumber || race.num_carrera} |{" "}
+              {race.date || race.fecha} - {race.time || race.hora}
             </div>
           </div>
         </div>
@@ -89,14 +84,14 @@ const BetModal = ({ race, onClose, onConfirmBet }) => {
         {/* Content */}
         <div className="p-4">
           {step === 1 && (
-            <BetTypeSelector 
+            <BetTypeSelector
               betTypes={betTypes}
               onSelect={handleBetTypeSelect}
             />
           )}
 
           {step === 2 && (
-            <HorseSelector 
+            <HorseSelector
               horses={race.horses}
               betType={betType}
               betTypeConfig={betTypes[betType]}
@@ -109,7 +104,8 @@ const BetModal = ({ race, onClose, onConfirmBet }) => {
           )}
 
           {step === 3 && (
-            <BetAmount 
+            <BetAmount
+              selectedRace={selected}
               betType={betType}
               selectedHorses={selectedHorses}
               amount={amount}
@@ -117,16 +113,18 @@ const BetModal = ({ race, onClose, onConfirmBet }) => {
               onBack={() => setStep(2)}
               onConfirm={handleConfirmBet}
               canProceed={canProceed()}
+              raceData={race} // ✅ Pasar datos completos de la carrera
+              user={user} // ✅ Pasar usuario autenticado
+              userSaldo={userSaldo} // ✅ Pasar saldo del usuario
             />
           )}
         </div>
 
         {/* Footer - Botón Cerrar */}
         <div className="bg-gray-50 p-4 border-t">
-          <button 
+          <button
             onClick={onClose}
-            className="w-full bg-secondary hover:bg-gray-700 text-white font-medium py-3 rounded-lg transition-colors"
-          >
+            className="w-full bg-secondary hover:bg-gray-700 text-white font-medium py-3 rounded-lg transition-colors">
             CERRAR
           </button>
         </div>
