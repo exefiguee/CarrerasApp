@@ -22,6 +22,11 @@ const BetAmount = ({
   const maxAmount = 50000;
   const quickAmounts = [200, 500, 1000, 2000, 5000, 10000];
 
+  // 🔍 Debug: Ver qué caballos llegan
+  console.log("🐴 selectedHorses en BetAmount:", selectedHorses);
+  console.log("🐴 Tipo:", typeof selectedHorses);
+  console.log("🐴 Es array?:", Array.isArray(selectedHorses));
+
   const potentialWin = betService.calculatePotentialWin(
     betType,
     selectedHorses,
@@ -65,12 +70,20 @@ const BetAmount = ({
       return;
     }
 
+    // ✅ Validar que selectedHorses tenga datos
+    if (!selectedHorses || selectedHorses.length === 0) {
+      setError("⚠️ Debes seleccionar al menos un caballo");
+      console.error("❌ No hay caballos seleccionados:", selectedHorses);
+      return;
+    }
+
     // Convertir selectedHorses a array si no lo es
     const horsesArray = Array.isArray(selectedHorses)
       ? selectedHorses
       : [selectedHorses];
 
     console.log("🐴 Caballos seleccionados ANTES de validar:", horsesArray);
+    console.log("🐴 Cantidad de caballos:", horsesArray.length);
 
     // Validar apuesta
     const validation = betService.validateBet(
@@ -165,9 +178,9 @@ const BetAmount = ({
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Caballos seleccionados:</span>
             <span className="text-white font-semibold">
-              {Array.isArray(selectedHorses)
-                ? selectedHorses.map((h) => `#${h.number}`).join(", ")
-                : "Ninguno"}
+              {selectedHorses && selectedHorses.length > 0
+                ? selectedHorses.map((h) => `#${h.number} ${h.name}`).join(", ")
+                : "⚠️ No hay caballos seleccionados"}
             </span>
           </div>
           <div className="flex justify-between text-sm">
@@ -233,11 +246,10 @@ const BetAmount = ({
                 key={amt}
                 onClick={() => onAmountChange(amt)}
                 disabled={loading}
-                className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                  amount === amt
-                    ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white border-2 border-fuchsia-400"
-                    : "bg-slate-800/50 text-slate-300 border border-slate-700/50 hover:border-fuchsia-500/50"
-                }`}>
+                className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${amount === amt
+                  ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white border-2 border-fuchsia-400"
+                  : "bg-slate-800/50 text-slate-300 border border-slate-700/50 hover:border-fuchsia-500/50"
+                  }`}>
                 ${amt.toLocaleString()}
               </button>
             ))}
@@ -310,11 +322,10 @@ const BetAmount = ({
         <button
           onClick={handleConfirmBet}
           disabled={!canProceed || loading || success}
-          className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all ${
-            canProceed && !loading && !success
-              ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 hover:from-fuchsia-500 hover:to-fuchsia-400 text-white shadow-lg shadow-fuchsia-500/30"
-              : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
-          }`}>
+          className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all ${canProceed && !loading && !success
+            ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 hover:from-fuchsia-500 hover:to-fuchsia-400 text-white shadow-lg shadow-fuchsia-500/30"
+            : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
+            }`}>
           {loading ? (
             <>
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>

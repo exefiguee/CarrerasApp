@@ -161,14 +161,50 @@ function App() {
               <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg shadow-fuchsia-500/20 border border-fuchsia-400/20">
                 <img
                   src="/logo.png"
-                  alt="Racing System Logo"
+                  alt="TURF424.BET"
                   className="w-10 h-10 md:w-12 md:h-12 object-contain"
                 />
               </div>
               <div>
-                <h1 className="text-lg md:text-2xl font-bold text-white tracking-tight">
-                  Racing System
-                </h1>
+                {/* <div className="text-center">
+                  <h1
+                    className="text-5xl md:text-2xl font-extrabold tracking-tight text-left"
+                    style={{
+                      color: '#ff00cc',
+                      textShadow: `0 0 2px #fff,0 0 3px #fff,0 0 4px #fff`,
+                    }}
+                  >
+                    TURF
+                    <span
+                      style={{
+                        color: 'white',
+                        textShadow: `0 0 2px #ff00cc, 0 0 3px #ff00cc, 0 0 4px #ff00cc`,
+                      }}
+                    >
+                      424
+                    </span>
+                    .BET
+                  </h1>
+
+                  <p
+                    className="text-sm md:text-lg font-semibold tracking-wider text-white"
+                    style={{
+                      textShadow: `0 0 3px #ff00ff,0 0 4px #ff00ff`,
+                    }}
+                  >
+                    GANA CON PASIÓN, GANA CON TURF424.BET
+                  </p>
+                </div> */}
+
+                <div className="flex items-center">
+                  <img
+                    src="/title.png"
+                    alt="TURF424.BET"
+                    className="w-auto h-10 md:h-10 object-contain drop-shadow-[0_0_10px_rgba(255,0,255,0.5)]"
+                  />
+                </div>
+
+
                 <div className="flex items-center gap-2 mt-0.5">
                   <Calendar className="w-3 h-3 md:w-4 md:h-4 text-fuchsia-400" />
                   <p className="text-xs md:text-sm text-slate-300">

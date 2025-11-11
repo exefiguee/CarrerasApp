@@ -13,6 +13,7 @@ import BetTypeSelector from "./BetTypeSelector";
 import HorseSelector from "./HorseSelector";
 import BetAmount from "./BetAmount";
 
+
 const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
   const [step, setStep] = useState(1);
   const [betType, setBetType] = useState(null);
@@ -32,17 +33,20 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
   };
 
   const handleBetTypeSelect = (type) => {
+    console.log("🎯 Tipo de apuesta seleccionado:", type);
     setBetType(type);
     setSelectedHorses([]);
     setStep(2);
   };
 
   const handleHorsesSelected = (horses) => {
+    console.log("🐴 Caballos seleccionados en modal:", horses);
     setSelectedHorses(horses);
     setStep(3);
   };
 
   const handleConfirmBet = () => {
+    console.log("✅ Confirmando apuesta con:", { betType, selectedHorses, amount });
     onClose();
   };
 

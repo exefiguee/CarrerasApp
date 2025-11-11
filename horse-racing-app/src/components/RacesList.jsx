@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import MiApuesta from './MiApuesta';
+import { auth, db } from "../firebase/config";
+
 import {
   Play,
   Calendar,
@@ -18,7 +21,7 @@ function CarreraCard({ carrera, isSelected, onSelect }) {
     const calculateTimeRemaining = () => {
       try {
         let day, month, year;
-        
+
         if (carrera.fecha.includes('/')) {
           [day, month, year] = carrera.fecha.split('/');
         } else if (carrera.fecha.includes('-')) {
@@ -28,21 +31,21 @@ function CarreraCard({ carrera, isSelected, onSelect }) {
           setTimeRemaining('--');
           return;
         }
-        
+
         const [hrs, mins] = carrera.hora.split(':');
-        
+
         const yearNum = parseInt(year);
         const monthNum = parseInt(month);
         const dayNum = parseInt(day);
         const hoursNum = parseInt(hrs);
         const minsNum = parseInt(mins);
-        
+
         if (isNaN(yearNum) || isNaN(monthNum) || isNaN(dayNum) || isNaN(hoursNum) || isNaN(minsNum)) {
           setStatus('upcoming');
           setTimeRemaining('--');
           return;
         }
-        
+
         const raceDate = new Date(yearNum, monthNum - 1, dayNum, hoursNum, minsNum);
         const now = new Date();
         const diff = raceDate - now;
@@ -145,28 +148,26 @@ function CarreraCard({ carrera, isSelected, onSelect }) {
     <button
       onClick={() => !isDisabled && onSelect(carrera)}
       disabled={isDisabled}
-      className={`group w-full text-left p-3 rounded-xl transition-all duration-300 ${
-        isDisabled
-          ? "bg-slate-900/20 border border-slate-800/30 opacity-50 cursor-not-allowed"
-          : isSelected
+      className={`group w-full text-left p-3 rounded-xl transition-all duration-300 ${isDisabled
+        ? "bg-slate-900/20 border border-slate-800/30 opacity-50 cursor-not-allowed"
+        : isSelected
           ? "from-fuchsia-500/25 via-fuchsia-600/20 to-slate-800/40 border-2 border-fuchsia-400/60 shadow-xl shadow-fuchsia-500/20 scale-[1.02]"
           : "bg-slate-800/40 border border-slate-700/50 hover:border-fuchsia-500/50 hover:shadow-lg hover:shadow-fuchsia-500/10"
-      }`}
+        }`}
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
           <span
-            className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all duration-300 ${
-              isDisabled
-                ? "bg-slate-800/30 text-slate-500 border border-slate-700/30"
-                : isSelected
+            className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all duration-300 ${isDisabled
+              ? "bg-slate-800/30 text-slate-500 border border-slate-700/30"
+              : isSelected
                 ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-900 text-white shadow-lg shadow-fuchsia-500/30"
                 : "bg-slate-800/50 text-fuchsia-400 border border-fuchsia-400/40 group-hover:border-fuchsia-400/60"
-            }`}
+              }`}
           >
             Carrera {carrera.num_carrera}
           </span>
-          
+
           {isSelected && !isDisabled && (
             <div className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 animate-pulse shadow-lg shadow-fuchsia-400/50" />
           )}
@@ -183,57 +184,51 @@ function CarreraCard({ carrera, isSelected, onSelect }) {
       </div>
 
       <div className="flex items-center gap-2 mb-2">
-        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
-          isDisabled
-            ? "bg-slate-800/30 text-slate-500"
-            : isSelected 
-            ? "bg-slate-900/50 text-fuchsia-300" 
+        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${isDisabled
+          ? "bg-slate-800/30 text-slate-500"
+          : isSelected
+            ? "bg-slate-900/50 text-fuchsia-300"
             : "bg-slate-800/50 text-slate-300 group-hover:text-fuchsia-400"
-        }`}>
+          }`}>
           <Clock className="w-3.5 h-3.5" />
           <span className="font-semibold text-xs">{carrera.hora}</span>
         </div>
-        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
-          isDisabled
-            ? "bg-slate-800/20 text-slate-500"
-            : isSelected 
-            ? "bg-slate-900/30 text-slate-300" 
+        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${isDisabled
+          ? "bg-slate-800/20 text-slate-500"
+          : isSelected
+            ? "bg-slate-900/30 text-slate-300"
             : "bg-slate-800/30 text-slate-400"
-        }`}>
+          }`}>
           <Calendar className="w-3.5 h-3.5" />
           <span className="text-xs">{carrera.fecha}</span>
         </div>
       </div>
 
-      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
-        isDisabled
-          ? "bg-slate-800/20 border border-slate-700/20"
-          : isSelected
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${isDisabled
+        ? "bg-slate-800/20 border border-slate-700/20"
+        : isSelected
           ? "bg-slate-900/40 border border-fuchsia-500/30"
           : "bg-slate-800/30 border border-slate-700/30 group-hover:border-fuchsia-500/20"
-      }`}>
-        <div className={`p-1.5 rounded-md transition-all ${
-          isDisabled
-            ? "bg-slate-700/30"
-            : isSelected 
-            ? "bg-fuchsia-500/20" 
+        }`}>
+        <div className={`p-1.5 rounded-md transition-all ${isDisabled
+          ? "bg-slate-700/30"
+          : isSelected
+            ? "bg-fuchsia-500/20"
             : "bg-slate-700/50 group-hover:bg-fuchsia-500/10"
-        }`}>
-          <Users className={`w-3.5 h-3.5 transition-colors ${
-            isDisabled
-              ? "text-slate-500"
-              : isSelected 
-              ? "text-fuchsia-400" 
-              : "text-slate-400 group-hover:text-fuchsia-400"
-          }`} />
-        </div>
-        <span className={`font-medium text-xs transition-colors ${
-          isDisabled
+          }`}>
+          <Users className={`w-3.5 h-3.5 transition-colors ${isDisabled
             ? "text-slate-500"
-            : isSelected 
-            ? "text-fuchsia-300" 
+            : isSelected
+              ? "text-fuchsia-400"
+              : "text-slate-400 group-hover:text-fuchsia-400"
+            }`} />
+        </div>
+        <span className={`font-medium text-xs transition-colors ${isDisabled
+          ? "text-slate-500"
+          : isSelected
+            ? "text-fuchsia-300"
             : "text-slate-300 group-hover:text-fuchsia-400"
-        }`}>
+          }`}>
           {carrera.caballos} caballos inscriptos
         </span>
       </div>
@@ -249,6 +244,8 @@ const RacesList = ({ onSelectRace }) => {
   const [selectedHipodromo, setSelectedHipodromo] = useState(null);
   const [selectedFecha, setSelectedFecha] = useState(null);
   const [selectedCarrera, setSelectedCarrera] = useState(null);
+  // const { auth } = useAuth(); // 👈 obtiene el usuario logueado
+  const [user, auth] = useState(null);
   const [iframeUrl, setIframeUrl] = useState(
     "public/canalcarreras.html?id=channel"
   );
@@ -406,7 +403,7 @@ const RacesList = ({ onSelectRace }) => {
     <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <div className="container mx-auto px-4 py-3 h-full flex flex-col ">
         {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0"> */}
-        <div className="grid grid-cols-1 lg:grid-cols-[65%_35%] gap-4 flex-1 min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-[50%_50%] gap-4 flex-1 min-h-0">
           <div className="flex flex-col h-full">
             <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800/50 overflow-hidden flex flex-col h-full">
               <div className="bg-gradient-to-r from-fuchsia-600/20 to-fuchsia-500/20 border-b border-slate-800/50 p-4">
@@ -437,23 +434,21 @@ const RacesList = ({ onSelectRace }) => {
               <div className="grid grid-cols-2 bg-slate-800/30 flex-shrink-0">
                 <button
                   onClick={() => setActiveTab("hipodromos")}
-                  className={`py-3 px-4 font-semibold text-sm md:text-base transition-all ${
-                    activeTab === "hipodromos"
-                      ? "bg-gradient-to-b from-fuchsia-600 to-fuchsia-500 text-white shadow-lg"
-                      : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-                  }`}
+                  className={`py-3 px-4 font-semibold text-sm md:text-base transition-all ${activeTab === "hipodromos"
+                    ? "bg-gradient-to-b from-fuchsia-600 to-fuchsia-500 text-white shadow-lg"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                    }`}
                 >
                   Hipódromos y Carreras
                 </button>
                 <button
                   onClick={() => setActiveTab("apuestas")}
-                  className={`py-3 px-4 font-semibold text-sm md:text-base transition-all ${
-                    activeTab === "apuestas"
-                      ? "bg-gradient-to-b from-fuchsia-600 to-fuchsia-500 text-white shadow-lg"
-                      : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-                  }`}
+                  className={`py-3 px-4 font-semibold text-sm md:text-base transition-all ${activeTab === "apuestas"
+                    ? "bg-gradient-to-b from-fuchsia-600 to-fuchsia-500 text-white shadow-lg"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                    }`}
                 >
-                  Apuestas
+                  Mis Apuestas
                 </button>
               </div>
 
@@ -572,24 +567,9 @@ const RacesList = ({ onSelectRace }) => {
                 )}
 
                 {activeTab === "apuestas" && (
-                  <div className="flex items-center justify-center py-20">
-                    <div className="text-center max-w-sm">
-                      <div className="w-24 h-24 rounded-full bg-gradient-to-br from-fuchsia-600/20 to-fuchsia-500/20 border-2 border-fuchsia-500/30 flex items-center justify-center mx-auto mb-6">
-                        <DollarSign className="w-12 h-12 text-fuchsia-400" />
-                      </div>
-                      <h3 className="text-2xl font-bold text-white mb-3">
-                        Sistema de Apuestas
-                      </h3>
-                      <p className="text-slate-400 mb-6">
-                        Próximamente podrás realizar y gestionar tus apuestas
-                        desde aquí
-                      </p>
-                      <button className="px-8 py-3 bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white rounded-xl font-semibold hover:from-fuchsia-500 hover:to-fuchsia-400 transition-all shadow-lg shadow-fuchsia-500/20">
-                        Próximamente
-                      </button>
-                    </div>
-                  </div>
+                  <MiApuesta userId={useState.uid} />
                 )}
+
               </div>
             </div>
           </div>

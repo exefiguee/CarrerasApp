@@ -53,8 +53,7 @@ const betService = {
     return Math.floor(amount * multiplier);
   },
 
-  // Crear apuesta en Firebase
-  // Crear apuesta en Firebase
+// Crear apuesta en Firebase
   createBet: async (userId, betData, userSaldo) => {
     try {
       // Validar que el usuario tenga saldo suficiente
@@ -75,62 +74,47 @@ const betService = {
         throw new Error("Debes seleccionar al menos un caballo");
       }
 
-      // ✅ Validar y limpiar campos obligatorios
-      const hipodromoId = betData.hipodromoId || "";
-      const hipodromoNombre =
-        betData.hipodromoNombre || betData.hipodromo || "Hipódromo desconocido";
-      const carreraId = betData.carreraId || "";
-      const numeroCarrera = Number(betData.numeroCarrera) || 0;
-      const fecha = betData.fecha || new Date().toISOString().split("T")[0];
-      const hora = betData.hora || "00:00";
-      const tipoApuesta = betData.betType || "";
-      const montoApostado = Number(betData.amount) || 0;
-      const gananciaPotencial = Number(betData.potentialWin) || 0;
+      console.log("🐴 Caballos recibidos en betData:", horsesArray);
 
-      console.log("🔍 Datos validados:", {
-        hipodromoId,
-        hipodromoNombre,
-        carreraId,
-        numeroCarrera,
-        fecha,
-        hora,
-        tipoApuesta,
-        montoApostado,
-        gananciaPotencial,
-      });
-
-      // ✅ Preparar caballos seleccionados sin undefined
+      // ✅ Preparar caballos seleccionados ANTES de validar otros campos
       const caballosSeleccionados = horsesArray.map((horse) => {
-        // ✅ Asegurar que number y name existan
         const numero = Number(horse.number) || Number(horse.numero) || 0;
-        const nombre = horse.name || horse.nombre || `CABALLO ${numero}`;
+        const nombre = String(horse.name || horse.nombre || `CABALLO ${numero}`);
 
-        console.log("🐴 Procesando caballo:", {
-          original: horse,
-          numero,
-          nombre,
-        });
+        console.log("🐴 Procesando caballo:", { original: horse, numero, nombre });
 
         return {
           numero: numero,
-          nombre: String(nombre),
+          nombre: nombre,
         };
       });
-
-      console.log("🐴 Caballos procesados:", caballosSeleccionados);
 
       // ✅ Crear string descriptivo de caballos apostados
       const caballosTexto = caballosSeleccionados
         .map((c) => `#${c.numero} ${c.nombre}`)
         .join(", ");
 
-      console.log("📝 Texto de caballos:", caballosTexto);
+      console.log("✅ Caballos procesados:", caballosSeleccionados);
+      console.log("✅ Texto de caballos:", caballosTexto);
+
+      // ✅ Validar y limpiar campos obligatorios
+      const hipodromoId = String(betData.hipodromoId || "");
+      const hipodromoNombre = String(
+        betData.hipodromoNombre || betData.hipodromo || "Hipódromo desconocido"
+      );
+      const carreraId = String(betData.carreraId || "");
+      const numeroCarrera = Number(betData.numeroCarrera) || 0;
+      const fecha = String(betData.fecha || new Date().toISOString().split("T")[0]);
+      const hora = String(betData.hora || "00:00");
+      const tipoApuesta = String(betData.betType || "");
+      const montoApostado = Number(betData.amount) || 0;
+      const gananciaPotencial = Number(betData.potentialWin) || 0;
 
       // Crear la apuesta en la subcolección APUESTAS del usuario
       const apuestasRef = collection(db, "USUARIOS", userId, "APUESTAS");
 
-      // ✅ Construir objeto SIN ningún undefined
-      const apuestaDataRaw = {
+      // ✅ Construir objeto DIRECTAMENTE sin cleanFirestoreData primero
+      const apuestaData = {
         // Información del hipódromo
         hipodromoId: hipodromoId,
         hipodromoNombre: hipodromoNombre,
@@ -143,8 +127,8 @@ const betService = {
 
         // Información de la apuesta
         tipoApuesta: tipoApuesta,
-        caballosSeleccionados: caballosSeleccionados,
-        caballosTexto: caballosTexto, // ✅ Texto legible de caballos
+        caballosSeleccionados: caballosSeleccionados, // Array limpio
+        caballosTexto: caballosTexto, // String limpio
 
         // Montos
         montoApostado: montoApostado,
@@ -158,16 +142,15 @@ const betService = {
         timestamp: Date.now(),
       };
 
-      // ✅ CRÍTICO: Limpiar cualquier undefined antes de guardar
-      const apuestaData = cleanFirestoreData(apuestaDataRaw);
+      console.log("🔥 Datos FINALES para Firestore:", JSON.stringify(apuestaData, null, 2));
 
-      console.log("🔥 Datos FINALES para Firestore:", apuestaData);
+      // ✅ Verificación final
+      if (!apuestaData.caballosSeleccionados || apuestaData.caballosSeleccionados.length === 0) {
+        throw new Error("Error: no hay caballos seleccionados");
+      }
 
-      // ✅ Verificación de seguridad
-      const hasUndefined = JSON.stringify(apuestaData).includes("undefined");
-      if (hasUndefined) {
-        console.error("⚠️ ALERTA: Aún hay undefined en los datos");
-        throw new Error("Error: datos inválidos detectados");
+      if (!apuestaData.caballosTexto) {
+        throw new Error("Error: falta texto de caballos");
       }
 
       // Guardar la apuesta
@@ -187,13 +170,14 @@ const betService = {
         mensaje: "Apuesta registrada exitosamente",
       };
     } catch (error) {
-      console.error("Error al crear apuesta:", error);
+      console.error("❌ Error al crear apuesta:", error);
       return {
         success: false,
         error: error.message,
       };
     }
   },
+  
   getUserBets: async (userId) => {
     try {
       const apuestasRef = collection(db, "USUARIOS", userId, "APUESTAS");
