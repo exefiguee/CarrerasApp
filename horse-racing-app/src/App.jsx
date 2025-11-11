@@ -13,16 +13,6 @@ function App() {
   const [selectedRace, setSelectedRace] = useState(null);
   const [betData, setBetData] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [data, setData] = useState(null);
-  const [transmisiones, setTransmisiones] = useState([]);
-  const [error, setError] = useState(null);
-  const [selectedHipodromo, setSelectedHipodromo] = useState(null);
-  const [selectedCarrera, setSelectedCarrera] = useState(null);
-  const [iframeUrl, setIframeUrl] = useState(
-    "public/canalcarreras.html?id=USANETWORK"
-  );
-  const [activeTab, setActiveTab] = useState("hipodromos");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
