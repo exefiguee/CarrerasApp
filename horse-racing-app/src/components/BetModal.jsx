@@ -64,7 +64,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800/50 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-600/20 via-emerald-500/20 to-slate-800/40 border-b border-slate-800/50 p-5">
+        <div className="bg-gradient-to-r from-fuchsia-600/20 via-fuchsia-500/20 to-slate-800/40 border-b border-slate-800/50 p-5">
           <div className="flex justify-between items-start mb-3">
             <div className="flex-1">
               <h2 className="text-xl font-bold text-white mb-1">
@@ -73,7 +73,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
                 {step === 3 && `Confirma tu ${betTypes[betType]?.label}`}
               </h2>
               <div className="flex items-center gap-2 text-sm">
-                <span className="px-2 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded text-emerald-300 font-semibold">
+                <span className="px-2 py-1 bg-fuchsia-500/20 border border-fuchsia-500/30 rounded text-fuchsia-300 font-semibold">
                   Paso {step}/3
                 </span>
               </div>
@@ -161,11 +161,11 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(16, 185, 129, 0.3);
+          background: rgba(217, 70, 239, 0.3);
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(16, 185, 129, 0.5);
+          background: rgba(217, 70, 239, 0.5);
         }
         @keyframes in {
           from {

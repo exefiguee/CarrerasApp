@@ -14,9 +14,9 @@ const BetTypeSelector = ({ betTypes, onSelect }) => {
   return (
     <div className="space-y-3">
       <div className="text-center mb-6">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl mb-3">
-          <Trophy className="w-5 h-5 text-emerald-400" />
-          <span className="text-emerald-300 font-semibold">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-fuchsia-500/20 border border-fuchsia-500/30 rounded-xl mb-3">
+          <Trophy className="w-5 h-5 text-fuchsia-400" />
+          <span className="text-fuchsia-300 font-semibold">
             Tipos de Apuesta
           </span>
         </div>
@@ -43,16 +43,16 @@ const BetTypeSelector = ({ betTypes, onSelect }) => {
             <button
               key={key}
               onClick={() => onSelect(key)}
-              className="group relative p-4 rounded-xl bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/10 transition-all duration-300 text-left overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-emerald-500/5 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
+              className="group relative p-4 rounded-xl bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 hover:border-fuchsia-500/50 hover:shadow-lg hover:shadow-fuchsia-500/10 transition-all duration-300 text-left overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-fuchsia-500/5 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
 
               <div className="relative flex items-start gap-3">
-                <div className="p-2.5 rounded-lg bg-emerald-500/20 border border-emerald-500/30 group-hover:bg-emerald-500/30 transition-colors">
-                  <Icon className="w-5 h-5 text-emerald-400" />
+                <div className="p-2.5 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/30 group-hover:bg-fuchsia-500/30 transition-colors">
+                  <Icon className="w-5 h-5 text-fuchsia-400" />
                 </div>
 
                 <div className="flex-1">
-                  <h3 className="font-bold text-white text-lg mb-1 group-hover:text-emerald-300 transition-colors">
+                  <h3 className="font-bold text-white text-lg mb-1 group-hover:text-fuchsia-300 transition-colors">
                     {config.label}
                   </h3>
                   <p className="text-xs text-slate-400">
@@ -64,7 +64,7 @@ const BetTypeSelector = ({ betTypes, onSelect }) => {
                   </p>
                 </div>
 
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 rotate-180 transition-colors" />
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-fuchsia-400 rotate-180 transition-colors" />
               </div>
             </button>
           );

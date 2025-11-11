@@ -148,8 +148,8 @@ const BetAmount = ({
       {/* Resumen de apuesta */}
       <div className="bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2 mb-3">
-          <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
-            <Trophy className="w-5 h-5 text-emerald-400" />
+          <div className="p-2 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/30">
+            <Trophy className="w-5 h-5 text-fuchsia-400" />
           </div>
           <h3 className="font-bold text-white">Resumen de Apuesta</h3>
         </div>
@@ -157,7 +157,7 @@ const BetAmount = ({
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Tipo de apuesta:</span>
-            <span className="text-emerald-300 font-semibold">{betType}</span>
+            <span className="text-fuchsia-300 font-semibold">{betType}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Caballos seleccionados:</span>
@@ -175,17 +175,17 @@ const BetAmount = ({
       </div>
 
       {/* Saldo disponible */}
-      <div className="bg-gradient-to-r from-emerald-500/20 to-slate-800/40 border border-emerald-500/30 rounded-xl p-4">
+      <div className="bg-gradient-to-r from-fuchsia-500/20 to-slate-800/40 border border-fuchsia-500/30 rounded-xl p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
-              <Wallet className="w-5 h-5 text-emerald-400" />
+            <div className="p-2 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/30">
+              <Wallet className="w-5 h-5 text-fuchsia-400" />
             </div>
             <span className="text-slate-300 font-semibold">
               Saldo disponible:
             </span>
           </div>
-          <span className="text-2xl font-bold text-emerald-300">
+          <span className="text-2xl font-bold text-fuchsia-300">
             ${userSaldo?.toLocaleString() || 0}
           </span>
         </div>
@@ -195,10 +195,10 @@ const BetAmount = ({
       <div className="space-y-3">
         <label className="block">
           <span className="text-slate-300 font-semibold mb-2 block">
-            Monto de la <span className="text-emerald-400">Apuesta</span>
+            Monto de la <span className="text-fuchsia-400">Apuesta</span>
           </span>
           <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 font-bold text-lg">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-fuchsia-400 font-bold text-lg">
               $
             </span>
             <input
@@ -210,7 +210,7 @@ const BetAmount = ({
               step="100"
               placeholder="0"
               disabled={loading}
-              className="w-full pl-10 pr-4 py-4 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-xl font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full pl-10 pr-4 py-4 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-xl font-bold focus:outline-none focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
           <p className="text-slate-500 text-xs mt-2">
@@ -232,8 +232,8 @@ const BetAmount = ({
                 disabled={loading}
                 className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   amount === amt
-                    ? "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white border-2 border-emerald-400"
-                    : "bg-slate-800/50 text-slate-300 border border-slate-700/50 hover:border-emerald-500/50"
+                    ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white border-2 border-fuchsia-400"
+                    : "bg-slate-800/50 text-slate-300 border border-slate-700/50 hover:border-fuchsia-500/50"
                 }`}>
                 ${amt.toLocaleString()}
               </button>
@@ -245,23 +245,23 @@ const BetAmount = ({
       {/* Total y Ganancia Potencial */}
       {amount > 0 && (
         <div className="space-y-3">
-          <div className="bg-gradient-to-r from-emerald-500/20 to-emerald-600/20 border-2 border-emerald-500/40 rounded-xl p-4">
+          <div className="bg-gradient-to-r from-fuchsia-500/20 to-fuchsia-600/20 border-2 border-fuchsia-500/40 rounded-xl p-4">
             <div className="flex justify-between items-center">
               <span className="text-slate-300 font-semibold">
                 Total a Apostar:
               </span>
-              <span className="text-3xl font-bold text-emerald-300">
+              <span className="text-3xl font-bold text-fuchsia-300">
                 ${amount.toLocaleString()}
               </span>
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-green-500/20 to-green-600/20 border-2 border-green-500/40 rounded-xl p-4">
+          <div className="bg-gradient-to-r from-fuchsia-500/20 to-fuchsia-600/20 border-2 border-fuchsia-500/40 rounded-xl p-4">
             <div className="flex justify-between items-center">
               <span className="text-slate-300 font-semibold">
                 Ganancia Potencial:
               </span>
-              <span className="text-3xl font-bold text-green-300">
+              <span className="text-3xl font-bold text-fuchsia-300">
                 ${potentialWin.toLocaleString()}
               </span>
             </div>
@@ -290,7 +290,7 @@ const BetAmount = ({
           disabled={!canProceed || loading}
           className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all ${
             canProceed && !loading
-              ? "bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-500/30"
+              ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 hover:from-fuchsia-500 hover:to-fuchsia-400 text-white shadow-lg shadow-fuchsia-500/30"
               : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
           }`}>
           {loading ? (

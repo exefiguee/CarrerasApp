@@ -33,12 +33,12 @@ const HorseSelector = ({
 
   return (
     <div className="space-y-4">
-      <div className="bg-gradient-to-r from-emerald-500/20 to-slate-800/40 border border-emerald-500/30 rounded-xl p-4">
+      <div className="bg-gradient-to-r from-fuchsia-500/20 to-slate-800/40 border border-fuchsia-500/30 rounded-xl p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-emerald-300 font-semibold">
+          <span className="text-fuchsia-300 font-semibold">
             Selección de Caballos
           </span>
-          <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-300 text-sm font-bold">
+          <span className="px-3 py-1 bg-fuchsia-500/20 border border-fuchsia-500/30 rounded-lg text-fuchsia-300 text-sm font-bold">
             {selectedHorses.length}/{betTypeConfig.maxHorses}
           </span>
         </div>
@@ -69,17 +69,17 @@ const HorseSelector = ({
               }
               className={`group w-full text-left p-4 rounded-xl transition-all duration-300 ${
                 isSelected
-                  ? "bg-gradient-to-br from-emerald-500/25 via-emerald-600/20 to-slate-800/40 border-2 border-emerald-400/60 shadow-lg shadow-emerald-500/20"
+                  ? "bg-gradient-to-br from-fuchsia-500/25 via-fuchsia-600/20 to-slate-800/40 border-2 border-fuchsia-400/60 shadow-lg shadow-fuchsia-500/20"
                   : selectedHorses.length >= betTypeConfig.maxHorses
                   ? "bg-slate-800/20 border border-slate-700/30 opacity-50 cursor-not-allowed"
-                  : "bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/10"
+                  : "bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 hover:border-fuchsia-500/50 hover:shadow-lg hover:shadow-fuchsia-500/10"
               }`}>
               <div className="flex items-center gap-4">
                 <div
                   className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg transition-all ${
                     isSelected
-                      ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30"
-                      : "bg-slate-800/50 text-slate-400 border border-slate-700/50 group-hover:border-emerald-500/50"
+                      ? "bg-gradient-to-br from-fuchsia-500 to-fuchsia-600 text-white shadow-lg shadow-fuchsia-500/30"
+                      : "bg-slate-800/50 text-slate-400 border border-slate-700/50 group-hover:border-fuchsia-500/50"
                   }`}>
                   {horse.number}
                 </div>
@@ -88,7 +88,7 @@ const HorseSelector = ({
                   <h3
                     className={`font-bold text-lg transition-colors ${
                       isSelected
-                        ? "text-emerald-300"
+                        ? "text-fuchsia-300"
                         : "text-slate-300 group-hover:text-white"
                     }`}>
                     {horse.name}
@@ -97,10 +97,10 @@ const HorseSelector = ({
 
                 {isSelected && (
                   <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 bg-emerald-500 text-white rounded-lg text-sm font-bold">
+                    <span className="px-3 py-1 bg-fuchsia-500 text-white rounded-lg text-sm font-bold">
                       #{selectionIndex + 1}
                     </span>
-                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-fuchsia-500 flex items-center justify-center">
                       <Check className="w-4 h-4 text-white" />
                     </div>
                   </div>
@@ -123,7 +123,7 @@ const HorseSelector = ({
           disabled={!canProceed}
           className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all ${
             canProceed
-              ? "bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-500/20"
+              ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 hover:from-fuchsia-500 hover:to-fuchsia-400 text-white shadow-lg shadow-fuchsia-500/20"
               : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
           }`}>
           Continuar
