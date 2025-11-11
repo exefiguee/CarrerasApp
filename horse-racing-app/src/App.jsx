@@ -12,10 +12,7 @@ function App() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedRace, setSelectedRace] = useState(null);
-<<<<<<< HEAD
-  const [betData, setBetData] = useState(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-=======
+
   const [data, setData] = useState(null);
   const [transmisiones, setTransmisiones] = useState([]);
   const [error, setError] = useState(null);
@@ -26,7 +23,7 @@ function App() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
->>>>>>> 64e6ab958158f9f851bbf4937e11fac8cda4776d
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
