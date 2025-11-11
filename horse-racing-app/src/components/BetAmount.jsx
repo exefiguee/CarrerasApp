@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Trophy, ChevronLeft, Check, DollarSign, Wallet } from "lucide-react";
 import betService from "../services/betService";
 
 const BetAmount = ({
@@ -18,6 +19,7 @@ const BetAmount = ({
 
   const minAmount = 200;
   const maxAmount = 50000;
+  const quickAmounts = [200, 500, 1000, 2000, 5000, 10000];
 
   const potentialWin = betService.calculatePotentialWin(
     betType,
@@ -94,7 +96,7 @@ const BetAmount = ({
 
       const betDataRaw = {
         hipodromoId: raceData?.id_hipodromo || "",
-        hipodromoNombre: hipodromoNombre, // ✅ Campo correcto
+        hipodromoNombre: hipodromoNombre,
         carreraId: raceData?.id || "",
         numeroCarrera: raceData?.num_carrera || raceData?.raceNumber || 0,
         fecha:
@@ -142,125 +144,175 @@ const BetAmount = ({
   };
 
   return (
-    <div>
-      <div className="mb-6">
-        <div className="bg-gray-100 rounded-lg p-4 mb-4">
-          <p className="text-sm text-gray-600 mb-1">
-            CABALLOS: {selectedHorses.length}
-          </p>
-          <p className="text-sm text-gray-600">CANTIDAD DE APUESTAS: 1</p>
-          <div className="mt-2 pt-2 border-t border-gray-300">
-            <p className="text-xs text-gray-700">
-              <strong>Tipo de apuesta:</strong> {betType}
-            </p>
-            <p className="text-xs text-gray-700">
-              <strong>Caballos:</strong>{" "}
+    <div className="space-y-6">
+      {/* Resumen de apuesta */}
+      <div className="bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
+            <Trophy className="w-5 h-5 text-emerald-400" />
+          </div>
+          <h3 className="font-bold text-white">Resumen de Apuesta</h3>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Tipo de apuesta:</span>
+            <span className="text-emerald-300 font-semibold">{betType}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Caballos seleccionados:</span>
+            <span className="text-white font-semibold">
               {Array.isArray(selectedHorses)
                 ? selectedHorses.map((h) => `#${h.number}`).join(", ")
                 : "Ninguno"}
-            </p>
-          </div>
-        </div>
-
-        {/* Mostrar saldo disponible */}
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-700">Tu saldo disponible:</span>
-            <span className="text-lg font-bold text-emerald-600">
-              ${userSaldo?.toLocaleString() || 0}
             </span>
           </div>
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Ingrese monto a <span className="text-primary">APOSTAR.</span>
-          </label>
-          <p className="text-xs text-gray-500 mb-2">(por apuesta)</p>
-
-          <input
-            type="number"
-            value={amount || ""}
-            onChange={(e) => handleAmountInput(e.target.value)}
-            placeholder="0"
-            className="w-full text-4xl font-bold text-center border-2 border-gray-300 rounded-lg p-4 focus:border-primary focus:outline-none"
-            min={minAmount}
-            max={maxAmount}
-            disabled={loading}
-          />
-        </div>
-
-        <div className="bg-secondary text-white rounded-lg p-4">
-          <div className="flex justify-between items-center">
-            <span className="text-sm">Importe de la APUESTA</span>
-            <span className="text-2xl font-bold">
-              ${amount.toLocaleString()}
-            </span>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Cantidad de apuestas:</span>
+            <span className="text-white font-semibold">1</span>
           </div>
-
-          {amount > 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-600">
-              <div className="flex justify-between items-center">
-                <span className="text-sm">Ganancia Potencial</span>
-                <span className="text-xl font-bold text-green-400">
-                  ${potentialWin.toLocaleString()}
-                </span>
-              </div>
-            </div>
-          )}
         </div>
-
-        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <p className="text-xs text-yellow-800">
-            <strong>Monto mínimo de apuesta:</strong> $
-            {minAmount.toLocaleString()}
-          </p>
-          <p className="text-xs text-yellow-800 mt-1">
-            <strong>Monto máximo de apuesta:</strong> $
-            {maxAmount.toLocaleString()}
-          </p>
-        </div>
-
-        {/* Mostrar errores */}
-        {error && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3">
-            <p className="text-sm text-red-600 font-medium">⚠️ {error}</p>
-          </div>
-        )}
       </div>
 
-      {/* Botones */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Saldo disponible */}
+      <div className="bg-gradient-to-r from-emerald-500/20 to-slate-800/40 border border-emerald-500/30 rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
+              <Wallet className="w-5 h-5 text-emerald-400" />
+            </div>
+            <span className="text-slate-300 font-semibold">
+              Saldo disponible:
+            </span>
+          </div>
+          <span className="text-2xl font-bold text-emerald-300">
+            ${userSaldo?.toLocaleString() || 0}
+          </span>
+        </div>
+      </div>
+
+      {/* Input de monto */}
+      <div className="space-y-3">
+        <label className="block">
+          <span className="text-slate-300 font-semibold mb-2 block">
+            Monto de la <span className="text-emerald-400">Apuesta</span>
+          </span>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 font-bold text-lg">
+              $
+            </span>
+            <input
+              type="number"
+              value={amount || ""}
+              onChange={(e) => handleAmountInput(e.target.value)}
+              min={minAmount}
+              max={maxAmount}
+              step="100"
+              placeholder="0"
+              disabled={loading}
+              className="w-full pl-10 pr-4 py-4 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-xl font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </div>
+          <p className="text-slate-500 text-xs mt-2">
+            Monto mínimo: ${minAmount.toLocaleString()} • Monto máximo: $
+            {maxAmount.toLocaleString()}
+          </p>
+        </label>
+
+        {/* Montos rápidos */}
+        <div>
+          <span className="text-slate-400 text-sm mb-2 block">
+            Montos rápidos:
+          </span>
+          <div className="grid grid-cols-3 gap-2">
+            {quickAmounts.map((amt) => (
+              <button
+                key={amt}
+                onClick={() => onAmountChange(amt)}
+                disabled={loading}
+                className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  amount === amt
+                    ? "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white border-2 border-emerald-400"
+                    : "bg-slate-800/50 text-slate-300 border border-slate-700/50 hover:border-emerald-500/50"
+                }`}>
+                ${amt.toLocaleString()}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Total y Ganancia Potencial */}
+      {amount > 0 && (
+        <div className="space-y-3">
+          <div className="bg-gradient-to-r from-emerald-500/20 to-emerald-600/20 border-2 border-emerald-500/40 rounded-xl p-4">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-300 font-semibold">
+                Total a Apostar:
+              </span>
+              <span className="text-3xl font-bold text-emerald-300">
+                ${amount.toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-green-500/20 to-green-600/20 border-2 border-green-500/40 rounded-xl p-4">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-300 font-semibold">
+                Ganancia Potencial:
+              </span>
+              <span className="text-3xl font-bold text-green-300">
+                ${potentialWin.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mostrar errores */}
+      {error && (
+        <div className="bg-red-500/20 border-2 border-red-500/40 rounded-xl p-4">
+          <p className="text-red-300 font-medium text-sm">⚠️ {error}</p>
+        </div>
+      )}
+
+      {/* Botones de navegación */}
+      <div className="flex gap-3 pt-2">
         <button
           onClick={onBack}
           disabled={loading}
-          className="bg-red-600 hover:bg-red-700 text-white font-medium py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-          ATRÁS
+          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          <ChevronLeft className="w-5 h-5" />
+          Volver
         </button>
         <button
           onClick={handleConfirmBet}
           disabled={!canProceed || loading}
-          className={`font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+          className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all ${
             canProceed && !loading
-              ? "bg-green-600 hover:bg-green-700 text-white"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              ? "bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-500/30"
+              : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
           }`}>
           {loading ? (
             <>
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              PROCESANDO...
+              Procesando...
             </>
           ) : (
-            "CONFIRMAR APUESTA"
+            <>
+              <Check className="w-5 h-5" />
+              Confirmar Apuesta
+            </>
           )}
         </button>
       </div>
 
+      {/* Botón cancelar */}
       <button
         onClick={() => onAmountChange(0)}
         disabled={loading}
-        className="w-full mt-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-        CANCELAR APUESTA
+        className="w-full px-6 py-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-slate-300 font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+        Cancelar Apuesta
       </button>
     </div>
   );

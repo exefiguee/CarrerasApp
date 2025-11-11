@@ -1,161 +1,133 @@
+import { useState } from "react";
+import {
+  X,
+  ChevronLeft,
+  Check,
+  Trophy,
+  Target,
+  Medal,
+  Sparkles,
+  ArrowRight,
+} from "lucide-react";
 const HorseSelector = ({
-  horses = [], // ✅ Evita que se quede en blanco si no hay caballos
+  horses,
   betType,
   betTypeConfig,
-  selectedHorses = [],
+  selectedHorses,
   onSelect,
   onBack,
   onNext,
   canProceed,
 }) => {
-  const colors = [
-    "bg-blue-400",
-    "bg-yellow-400",
-    "bg-green-500",
-    "bg-pink-500",
-    "bg-black",
-    "bg-white",
-    "bg-orange-500",
-    "bg-gray-500",
-  ];
-
-  const getPositionLabel = () => {
-    if (betType === "GANADOR") return "A GANADOR:";
-    if (betType === "SEGUNDO") return "A SEGUNDO:";
-    if (betType === "TERCERO") return "A TERCER PUESTO:";
-    if (betType === "EXACTA") return "A PRIMER Y SEGUNDO:";
-    return "A PRIMER, SEGUNDO Y TERCER PUESTO:";
-  };
-
-  const handleHorseClick = (horse) => {
+  const toggleHorse = (horse) => {
     const isSelected = selectedHorses.some((h) => h.number === horse.number);
 
     if (isSelected) {
-      // Deseleccionar
       onSelect(selectedHorses.filter((h) => h.number !== horse.number));
-    } else if (selectedHorses.length < betTypeConfig.maxHorses) {
-      // ✅ Asegurar que se guarden correctamente number y name
-      const horseToAdd = {
-        number: horse.number,
-        name: horse.name || `CABALLO ${horse.number}`,
-      };
-      onSelect([...selectedHorses, horseToAdd]);
+    } else {
+      if (selectedHorses.length < betTypeConfig.maxHorses) {
+        onSelect([...selectedHorses, horse]);
+      }
     }
   };
 
-  const isHorseSelected = (horseNumber) => {
-    return selectedHorses.some((h) => h.number === horseNumber);
-  };
-
   return (
-    <div>
-      {/* Encabezado */}
-      <div className="mb-4">
-        <p className="text-center text-red-600 font-medium mb-2">
-          SELECCIONE LOS CABALLOS
-        </p>
-        <p className="text-center text-sm font-bold">{getPositionLabel()}</p>
-        <p className="text-center text-xs text-gray-600 mt-1">
-          (Tope de apuestas: {betTypeConfig.maxHorses})
+    <div className="space-y-4">
+      <div className="bg-gradient-to-r from-emerald-500/20 to-slate-800/40 border border-emerald-500/30 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-emerald-300 font-semibold">
+            Selección de Caballos
+          </span>
+          <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-300 text-sm font-bold">
+            {selectedHorses.length}/{betTypeConfig.maxHorses}
+          </span>
+        </div>
+        <p className="text-slate-400 text-sm">
+          {betTypeConfig.minHorses === betTypeConfig.maxHorses
+            ? `Debes seleccionar exactamente ${betTypeConfig.minHorses} ${
+                betTypeConfig.minHorses === 1 ? "caballo" : "caballos"
+              }`
+            : `Selecciona entre ${betTypeConfig.minHorses} y ${betTypeConfig.maxHorses} caballos`}
         </p>
       </div>
 
-      {/* Lista de caballos */}
-      <div className="space-y-2 mb-4">
-        <div className="grid grid-cols-12 gap-2 font-bold text-xs text-gray-700 px-2">
-          <div className="col-span-2">N°</div>
-          <div className="col-span-8">CABALLOS</div>
-          <div className="col-span-2 text-right"></div>
-        </div>
+      <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+        {horses.map((horse) => {
+          const isSelected = selectedHorses.some(
+            (h) => h.number === horse.number
+          );
+          const selectionIndex = selectedHorses.findIndex(
+            (h) => h.number === horse.number
+          );
 
-        {horses.length === 0 ? (
-          <div className="text-center text-gray-500 py-6">
-            No hay caballos disponibles para esta carrera 🐎
-          </div>
-        ) : (
-          horses.map((horse, index) => {
-            const selected = isHorseSelected(horse.number);
-            const color = colors[(horse.number - 1) % colors.length];
+          return (
+            <button
+              key={horse.number}
+              onClick={() => toggleHorse(horse)}
+              disabled={
+                !isSelected && selectedHorses.length >= betTypeConfig.maxHorses
+              }
+              className={`group w-full text-left p-4 rounded-xl transition-all duration-300 ${
+                isSelected
+                  ? "bg-gradient-to-br from-emerald-500/25 via-emerald-600/20 to-slate-800/40 border-2 border-emerald-400/60 shadow-lg shadow-emerald-500/20"
+                  : selectedHorses.length >= betTypeConfig.maxHorses
+                  ? "bg-slate-800/20 border border-slate-700/30 opacity-50 cursor-not-allowed"
+                  : "bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/10"
+              }`}>
+              <div className="flex items-center gap-4">
+                <div
+                  className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg transition-all ${
+                    isSelected
+                      ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30"
+                      : "bg-slate-800/50 text-slate-400 border border-slate-700/50 group-hover:border-emerald-500/50"
+                  }`}>
+                  {horse.number}
+                </div>
 
-            return (
-              <div
-                key={`horse-${horse.number}-${index}`}
-                onClick={() => handleHorseClick(horse)}
-                className={`grid grid-cols-12 gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                  selected
-                    ? "border-green-600 bg-green-50 shadow-md"
-                    : "border-gray-200 hover:border-purple-200 bg-white"
-                }`}>
-                {/* Número */}
-                <div className="col-span-2 flex items-center">
-                  <div
-                    className={`${color} ${
-                      color === "bg-white"
-                        ? "border border-gray-300 text-black"
-                        : "text-white"
-                    } w-10 h-10 rounded-full flex items-center justify-center font-bold`}>
-                    {horse.number}
+                <div className="flex-1">
+                  <h3
+                    className={`font-bold text-lg transition-colors ${
+                      isSelected
+                        ? "text-emerald-300"
+                        : "text-slate-300 group-hover:text-white"
+                    }`}>
+                    {horse.name}
+                  </h3>
+                </div>
+
+                {isSelected && (
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 bg-emerald-500 text-white rounded-lg text-sm font-bold">
+                      #{selectionIndex + 1}
+                    </span>
+                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
                   </div>
-                </div>
-
-                {/* Info del caballo */}
-                <div className="col-span-8 flex flex-col justify-center">
-                  <div className="font-bold text-gray-800">{horse.name}</div>
-                  {horse.jockey && (
-                    <div className="text-xs text-gray-600">{horse.jockey}</div>
-                  )}
-                </div>
-
-                {/* Checkbox */}
-                <div className="col-span-2 flex items-center justify-end">
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    readOnly
-                    className="w-5 h-5 accent-green-600 cursor-pointer"
-                  />
-                </div>
+                )}
               </div>
-            );
-          })
-        )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Selección actual */}
-      {selectedHorses.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-          <p className="text-sm font-bold text-blue-900 mb-2">
-            Caballos seleccionados ({selectedHorses.length}/
-            {betTypeConfig.maxHorses}):
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {selectedHorses.map((horse, index) => (
-              <span
-                key={`selected-${horse.number}-${index}`}
-                className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm">
-                {index + 1}° → #{horse.number} {horse.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Botones */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="flex gap-3 pt-2">
         <button
           onClick={onBack}
-          className="bg-red-600 hover:bg-red-700 text-white font-medium py-3 rounded-lg transition-colors">
-          ATRÁS
+          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-white font-semibold rounded-xl transition-all">
+          <ChevronLeft className="w-5 h-5" />
+          Volver
         </button>
         <button
           onClick={onNext}
           disabled={!canProceed}
-          className={`font-medium py-3 rounded-lg transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all ${
             canProceed
-              ? "bg-green-600 hover:bg-green-700 text-white"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              ? "bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-500/20"
+              : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
           }`}>
-          SIGUIENTE
+          Continuar
+          <ChevronLeft className="w-5 h-5 rotate-180" />
         </button>
       </div>
     </div>
