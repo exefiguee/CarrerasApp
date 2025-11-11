@@ -405,7 +405,8 @@ const RacesList = ({ onSelectRace }) => {
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <div className="container mx-auto px-4 py-3 h-full flex flex-col ">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
+        {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0"> */}
+        <div className="grid grid-cols-1 lg:grid-cols-[65%_35%] gap-4 flex-1 min-h-0">
           <div className="flex flex-col h-full">
             <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800/50 overflow-hidden flex flex-col h-full">
               <div className="bg-gradient-to-r from-fuchsia-600/20 to-fuchsia-500/20 border-b border-slate-800/50 p-4">

@@ -16,6 +16,7 @@ const BetAmount = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   const minAmount = 200;
   const maxAmount = 50000;
@@ -130,8 +131,10 @@ const BetAmount = ({
       const result = await betService.createBet(user.uid, betData, userSaldo);
 
       if (result.success) {
-        alert("¡Apuesta registrada exitosamente! 🎉");
-        onConfirm();
+        setSuccess(true);
+        setTimeout(() => {
+          onConfirm();
+        }, 2000);
       } else {
         setError(result.error || "Error al registrar la apuesta");
       }
@@ -269,6 +272,25 @@ const BetAmount = ({
         </div>
       )}
 
+      {/* Mensaje de éxito */}
+      {success && (
+        <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-500/40 rounded-xl p-4 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-green-500/20 border border-green-500/30">
+              <Check className="w-6 h-6 text-green-400" />
+            </div>
+            <div>
+              <p className="text-green-300 font-bold text-lg">
+                ¡Apuesta registrada exitosamente! 🎉
+              </p>
+              <p className="text-green-400/80 text-sm">
+                Redirigiendo...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mostrar errores */}
       {error && (
         <div className="bg-red-500/20 border-2 border-red-500/40 rounded-xl p-4">
@@ -280,16 +302,16 @@ const BetAmount = ({
       <div className="flex gap-3 pt-2">
         <button
           onClick={onBack}
-          disabled={loading}
+          disabled={loading || success}
           className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
           <ChevronLeft className="w-5 h-5" />
           Volver
         </button>
         <button
           onClick={handleConfirmBet}
-          disabled={!canProceed || loading}
+          disabled={!canProceed || loading || success}
           className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all ${
-            canProceed && !loading
+            canProceed && !loading && !success
               ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 hover:from-fuchsia-500 hover:to-fuchsia-400 text-white shadow-lg shadow-fuchsia-500/30"
               : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
           }`}>
@@ -297,6 +319,11 @@ const BetAmount = ({
             <>
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               Procesando...
+            </>
+          ) : success ? (
+            <>
+              <Check className="w-5 h-5" />
+              ¡Confirmada!
             </>
           ) : (
             <>
@@ -310,7 +337,7 @@ const BetAmount = ({
       {/* Botón cancelar */}
       <button
         onClick={() => onAmountChange(0)}
-        disabled={loading}
+        disabled={loading || success}
         className="w-full px-6 py-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-slate-300 font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
         Cancelar Apuesta
       </button>

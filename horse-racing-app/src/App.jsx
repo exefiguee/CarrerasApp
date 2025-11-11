@@ -128,9 +128,8 @@ function App() {
 
   const handleAddBalance = () => {
     if (user && userData) {
-      const mensaje = `Hola, quiero agregar saldo a mi cuenta.%0A%0AID de Usuario: ${
-        user.uid
-      }%0AEmail: ${userData.EMAIL}%0ASaldo actual: $${userData.SALDO || 0}`;
+      const mensaje = `Hola, quiero agregar saldo a mi cuenta.%0A%0AID de Usuario: ${user.uid
+        }%0AEmail: ${userData.EMAIL}%0ASaldo actual: $${userData.SALDO || 0}`;
       window.open(`https://wa.me/543813444655?text=${mensaje}`, "_blank");
     }
   };
@@ -160,9 +159,9 @@ function App() {
             {/* Logo */}
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg shadow-fuchsia-500/20 border border-fuchsia-400/20">
-                <img 
-                  src="/logo.png" 
-                  alt="Racing System Logo" 
+                <img
+                  src="/logo.png"
+                  alt="Racing System Logo"
                   className="w-10 h-10 md:w-12 md:h-12 object-contain"
                 />
               </div>
@@ -227,14 +226,20 @@ function App() {
                 <div className="flex items-center gap-3 pl-4 border-l border-fuchsia-900/30">
                   <button
                     onClick={() => setShowLoginModal(true)}
+                    className="p-2.5 rounded-xl bg-slate-800/50 backdrop-blur-sm border border-fuchsia-900/30 text-slate-300 hover:text-fuchsia-400 hover:bg-slate-800 hover:border-fuchsia-500/40 transition-all"
+                    title="Ver Perfil">
+                    <User className="w-5 h-5" />
+                  </button>
+                  {/* <button
+                    onClick={() => setShowLoginModal(true)}
                     className="px-5 py-2.5 rounded-xl bg-fuchsia-500/20 backdrop-blur-sm border border-fuchsia-400/40 text-fuchsia-300 hover:bg-fuchsia-500/30 hover:border-fuchsia-400/60 hover:text-white transition-all font-semibold text-sm shadow-lg shadow-fuchsia-500/10">
                     Iniciar Sesión
-                  </button>
-                  <button
+                  </button> */}
+                  {/* <button
                     onClick={handleCreateAccount}
                     className="px-5 py-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 hover:border-white/30 transition-all font-semibold text-sm">
                     Crear Cuenta
-                  </button>
+                  </button> */}
                 </div>
               )}
             </div>
@@ -442,9 +447,9 @@ function App() {
 
             <div className="flex flex-col items-center text-center mb-6">
               <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-xl shadow-fuchsia-500/20 mb-4 border border-fuchsia-400/20">
-                <img 
-                  src="/logo.png" 
-                  alt="Racing System Logo" 
+                <img
+                  src="/logo.png"
+                  alt="Racing System Logo"
                   className="w-14 h-14 object-contain"
                 />
               </div>
