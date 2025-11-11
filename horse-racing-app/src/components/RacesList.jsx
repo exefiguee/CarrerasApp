@@ -7,10 +7,253 @@ import {
   Users,
   TrendingUp,
   Info,
-  Minimize2,
-  Maximize2,
-  X,
 } from "lucide-react";
+
+// Componente CarreraCard con contador de tiempo
+function CarreraCard({ carrera, isSelected, onSelect }) {
+  const [timeRemaining, setTimeRemaining] = useState('');
+  const [status, setStatus] = useState('upcoming'); // 'upcoming', 'soon', 'live', 'finished'
+
+  useEffect(() => {
+    const calculateTimeRemaining = () => {
+      try {
+        // Parsear fecha y hora de la carrera
+        // Asumiendo formato: fecha="DD/MM/YYYY" o "YYYY-MM-DD" y hora="HH:MM"
+        let day, month, year;
+        
+        if (carrera.fecha.includes('/')) {
+          [day, month, year] = carrera.fecha.split('/');
+        } else if (carrera.fecha.includes('-')) {
+          [year, month, day] = carrera.fecha.split('-');
+        } else {
+          setStatus('upcoming');
+          setTimeRemaining('--');
+          return;
+        }
+        
+        const [hrs, mins] = carrera.hora.split(':');
+        
+        // Convertir a números y validar
+        const yearNum = parseInt(year);
+        const monthNum = parseInt(month);
+        const dayNum = parseInt(day);
+        const hoursNum = parseInt(hrs);
+        const minsNum = parseInt(mins);
+        
+        if (isNaN(yearNum) || isNaN(monthNum) || isNaN(dayNum) || isNaN(hoursNum) || isNaN(minsNum)) {
+          setStatus('upcoming');
+          setTimeRemaining('--');
+          return;
+        }
+        
+        const raceDate = new Date(yearNum, monthNum - 1, dayNum, hoursNum, minsNum);
+        const now = new Date();
+        const diff = raceDate - now;
+
+        if (diff < 0) {
+          setStatus('finished');
+          setTimeRemaining('Finalizada');
+          return;
+        }
+
+        // Si faltan menos de 5 minutos
+        if (diff < 5 * 60 * 1000) {
+          setStatus('live');
+          const minutes = Math.floor(diff / 60000);
+          const secs = Math.floor((diff % 60000) / 1000);
+          setTimeRemaining(`${minutes}m ${secs}s`);
+          return;
+        }
+
+        // Si faltan menos de 30 minutos
+        if (diff < 30 * 60 * 1000) {
+          setStatus('soon');
+          const minutes = Math.floor(diff / 60000);
+          setTimeRemaining(`${minutes} minutos`);
+          return;
+        }
+
+        // Si falta menos de 24 horas
+        if (diff < 24 * 60 * 60 * 1000) {
+          setStatus('upcoming');
+          const hours = Math.floor(diff / 3600000);
+          const minutes = Math.floor((diff % 3600000) / 60000);
+          if (hours > 0) {
+            setTimeRemaining(`${hours}h ${minutes}m`);
+          } else {
+            setTimeRemaining(`${minutes} minutos`);
+          }
+          return;
+        }
+
+        // Si falta más de 24 horas
+        setStatus('upcoming');
+        const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+        const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / 3600000);
+        if (days > 0) {
+          setTimeRemaining(`${days}d ${hours}h`);
+        } else {
+          setTimeRemaining(`${hours}h`);
+        }
+      } catch (error) {
+        console.error('Error calculando tiempo:', error);
+        setStatus('upcoming');
+        setTimeRemaining('--');
+      }
+    };
+
+    calculateTimeRemaining();
+    const interval = setInterval(calculateTimeRemaining, 1000);
+
+    return () => clearInterval(interval);
+  }, [carrera.fecha, carrera.hora]);
+
+  // Colores según el estado
+  const getStatusColors = () => {
+    switch (status) {
+      case 'live':
+        return {
+          bg: 'bg-red-500/20',
+          border: 'border-red-400/50',
+          text: 'text-red-400',
+          icon: 'text-red-400',
+          pulse: true
+        };
+      case 'soon':
+        return {
+          bg: 'bg-amber-500/20',
+          border: 'border-amber-400/50',
+          text: 'text-amber-400',
+          icon: 'text-amber-400',
+          pulse: false
+        };
+      case 'finished':
+        return {
+          bg: 'bg-slate-500/20',
+          border: 'border-slate-400/50',
+          text: 'text-slate-400',
+          icon: 'text-slate-400',
+          pulse: false
+        };
+      default:
+        return {
+          bg: 'bg-emerald-500/20',
+          border: 'border-emerald-400/50',
+          text: 'text-emerald-400',
+          icon: 'text-emerald-400',
+          pulse: false
+        };
+    }
+  };
+
+  const statusColors = getStatusColors();
+  const isDisabled = status === 'finished';
+
+  return (
+    <button
+      onClick={() => !isDisabled && onSelect(carrera)}
+      disabled={isDisabled}
+      className={`group w-full text-left p-3 rounded-xl transition-all duration-300 ${
+        isDisabled
+          ? "bg-slate-900/20 border border-slate-800/30 opacity-50 cursor-not-allowed"
+          : isSelected
+          ? "bg-gradient-to-br from-emerald-500/25 via-emerald-600/20 to-slate-800/40 border-2 border-emerald-400/60 shadow-xl shadow-emerald-500/20 scale-[1.02]"
+          : "bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/10"
+      }`}
+    >
+      {/* Header con badge y tiempo restante */}
+      <div className="flex items-start justify-between mb-2">
+        {/* Badge de número de carrera */}
+        <div className="flex items-center gap-2">
+          <span
+            className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all duration-300 ${
+              isDisabled
+                ? "bg-slate-800/30 text-slate-500 border border-slate-700/30"
+                : isSelected
+                ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30"
+                : "bg-slate-800/50 text-emerald-400 border border-emerald-400/40 group-hover:border-emerald-400/60"
+            }`}
+          >
+            Carrera {carrera.num_carrera}
+          </span>
+          
+          {/* Indicador de selección */}
+          {isSelected && !isDisabled && (
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-lg shadow-emerald-400/50" />
+          )}
+        </div>
+
+        {/* Tiempo restante */}
+        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border ${statusColors.bg} ${statusColors.border}`}>
+          <Clock className={`w-3.5 h-3.5 ${statusColors.icon} ${statusColors.pulse ? 'animate-pulse' : ''}`} />
+          <span className={`font-bold text-xs ${statusColors.text}`}>
+            {status === 'live' && '¡En '}
+            {timeRemaining}
+            {status === 'live' && '!'}
+          </span>
+        </div>
+      </div>
+
+      {/* Hora y Fecha */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
+          isDisabled
+            ? "bg-slate-800/30 text-slate-500"
+            : isSelected 
+            ? "bg-slate-900/50 text-emerald-300" 
+            : "bg-slate-800/50 text-slate-300 group-hover:text-emerald-400"
+        }`}>
+          <Clock className="w-3.5 h-3.5" />
+          <span className="font-semibold text-xs">{carrera.hora}</span>
+        </div>
+        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
+          isDisabled
+            ? "bg-slate-800/20 text-slate-500"
+            : isSelected 
+            ? "bg-slate-900/30 text-slate-300" 
+            : "bg-slate-800/30 text-slate-400"
+        }`}>
+          <Calendar className="w-3.5 h-3.5" />
+          <span className="text-xs">{carrera.fecha}</span>
+        </div>
+      </div>
+
+      {/* Info de caballos */}
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+        isDisabled
+          ? "bg-slate-800/20 border border-slate-700/20"
+          : isSelected
+          ? "bg-slate-900/40 border border-emerald-500/30"
+          : "bg-slate-800/30 border border-slate-700/30 group-hover:border-emerald-500/20"
+      }`}>
+        <div className={`p-1.5 rounded-md transition-all ${
+          isDisabled
+            ? "bg-slate-700/30"
+            : isSelected 
+            ? "bg-emerald-500/20" 
+            : "bg-slate-700/50 group-hover:bg-emerald-500/10"
+        }`}>
+          <Users className={`w-3.5 h-3.5 transition-colors ${
+            isDisabled
+              ? "text-slate-500"
+              : isSelected 
+              ? "text-emerald-400" 
+              : "text-slate-400 group-hover:text-emerald-400"
+          }`} />
+        </div>
+        <span className={`font-medium text-xs transition-colors ${
+          isDisabled
+            ? "text-slate-500"
+            : isSelected 
+            ? "text-emerald-300" 
+            : "text-slate-300 group-hover:text-emerald-400"
+        }`}>
+          {carrera.caballos} caballos inscriptos
+        </span>
+      </div>
+    </button>
+  );
+}
 
 const RacesList = ({ onSelectRace }) => {
   const [data, setData] = useState(null);
@@ -133,7 +376,6 @@ const RacesList = ({ onSelectRace }) => {
       name: `CABALLO ${i + 1}`,
     }));
 
-    // ✅ Obtener el nombre del hipódromo
     const hipodromoInfo = getHipodromoInfo(carrera.id_hipodromo);
     const hipodromoNombre =
       hipodromoInfo?.descripcion || "Hipódromo desconocido";
@@ -142,7 +384,7 @@ const RacesList = ({ onSelectRace }) => {
       onSelectRace({
         ...carrera,
         horses: generatedHorses,
-        descripcion_hipodromo: hipodromoNombre, // ✅ Agregar nombre del hipódromo
+        descripcion_hipodromo: hipodromoNombre,
       });
     }
   };
@@ -184,13 +426,13 @@ const RacesList = ({ onSelectRace }) => {
   const carrerasDelHipodromo = getCarrerasDelHipodromo();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6">
-        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-6">
+      <div className="container mx-auto px-4 py-3 h-full flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
           {/* Columna Izquierda - Transmisiones */}
-          <div className="space-y-4">
-            <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800/50 overflow-hidden">
+          <div className="flex flex-col h-full">
+            <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800/50 overflow-hidden flex flex-col h-full">
               {/* Header con botón PIP */}
               <div className="bg-gradient-to-r from-emerald-600/20 to-emerald-500/20 border-b border-slate-800/50 p-4">
                 <div className="flex items-center justify-between">
@@ -204,8 +446,7 @@ const RacesList = ({ onSelectRace }) => {
               </div>
 
               {/* Iframe */}
-
-              <div className="aspect-video bg-black">
+              <div className="aspect-video bg-black flex-shrink-0">
                 <iframe
                   src={iframeUrl}
                   className="w-full h-full border-0"
@@ -216,7 +457,7 @@ const RacesList = ({ onSelectRace }) => {
               </div>
 
               {/* Lista de transmisiones */}
-              <div className="p-4 max-h-64 overflow-y-auto custom-scrollbar">
+              <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
                 <div className="space-y-2">
                   {transmisiones.map((t, i) => {
                     const isActive = iframeUrl === t.link;
@@ -232,12 +473,14 @@ const RacesList = ({ onSelectRace }) => {
                           isActive
                             ? "bg-gradient-to-r from-emerald-600 to-emerald-500 shadow-lg shadow-emerald-500/20"
                             : "bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-emerald-500/50"
-                        }`}>
+                        }`}
+                      >
                         <div className="flex items-center justify-between gap-2">
                           <p
                             className={`font-medium text-sm ${
                               isActive ? "text-white" : "text-slate-300"
-                            }`}>
+                            }`}
+                          >
                             {t.descripcion}
                           </p>
                           {isArg && (
@@ -255,17 +498,18 @@ const RacesList = ({ onSelectRace }) => {
           </div>
 
           {/* Columna Derecha - Contenido */}
-          <div className="space-y-4">
+          <div className="flex flex-col h-full">
             {/* Tabs */}
-            <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800/50 overflow-hidden">
-              <div className="grid grid-cols-3 bg-slate-800/30">
+            <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800/50 overflow-hidden flex flex-col h-full">
+              <div className="grid grid-cols-3 bg-slate-800/30 flex-shrink-0">
                 <button
                   onClick={() => setActiveTab("hipodromos")}
                   className={`py-3 px-4 font-semibold text-sm md:text-base transition-all ${
                     activeTab === "hipodromos"
                       ? "bg-gradient-to-b from-emerald-600 to-emerald-500 text-white shadow-lg"
                       : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-                  }`}>
+                  }`}
+                >
                   Hipódromos
                 </button>
                 <button
@@ -274,7 +518,8 @@ const RacesList = ({ onSelectRace }) => {
                     activeTab === "carreras"
                       ? "bg-gradient-to-b from-emerald-600 to-emerald-500 text-white shadow-lg"
                       : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-                  }`}>
+                  }`}
+                >
                   Carreras
                 </button>
                 <button
@@ -283,7 +528,8 @@ const RacesList = ({ onSelectRace }) => {
                     activeTab === "apuestas"
                       ? "bg-gradient-to-b from-emerald-600 to-emerald-500 text-white shadow-lg"
                       : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-                  }`}>
+                  }`}
+                >
                   Apuestas
                 </button>
               </div>
@@ -301,7 +547,8 @@ const RacesList = ({ onSelectRace }) => {
                           setSelectedHipodromo(e.target.value || null);
                           setSelectedCarrera(null);
                         }}
-                        className="px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-sm font-medium cursor-pointer transition-all hover:border-emerald-500/50 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
+                        className="px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-sm font-medium cursor-pointer transition-all hover:border-emerald-500/50 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      >
                         <option value="">🏟️ Todos los hipódromos</option>
                         {data?.hipodromos.map((hip) => (
                           <option key={hip.id} value={hip.id}>
@@ -316,7 +563,8 @@ const RacesList = ({ onSelectRace }) => {
                           setSelectedFecha(e.target.value || null);
                           setSelectedCarrera(null);
                         }}
-                        className="px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-sm font-medium cursor-pointer transition-all hover:border-blue-500/50 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                        className="px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-sm font-medium cursor-pointer transition-all hover:border-blue-500/50 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      >
                         <option value="">📅 Todas las fechas</option>
                         {[...new Set(data?.carreras.map((c) => c.fecha))].map(
                           (fecha) => (
@@ -356,7 +604,8 @@ const RacesList = ({ onSelectRace }) => {
                                 isSelected
                                   ? "bg-gradient-to-r from-emerald-600/20 to-emerald-500/20 border-2 border-emerald-500/50 shadow-lg shadow-emerald-500/10"
                                   : "bg-slate-800/30 border border-slate-700/50 hover:border-slate-600/50"
-                              }`}>
+                              }`}
+                            >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1">
                                   <h3 className="font-bold text-white text-lg mb-1">
@@ -388,84 +637,28 @@ const RacesList = ({ onSelectRace }) => {
                     {carrerasDelHipodromo.length === 0 ? (
                       <div className="flex items-center justify-center py-20">
                         <div className="text-center">
-                          <div className="w-20 h-20 rounded-full bg-slate-800/50 flex items-center justify-center mx-auto mb-4">
-                            <TrendingUp className="w-10 h-10 text-slate-600" />
+                          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500/20 to-slate-800/50 flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
+                            <TrendingUp className="w-10 h-10 text-emerald-400" />
                           </div>
-                          <p className="text-lg font-semibold text-slate-300 mb-2">
+                          <p className="text-lg font-semibold text-slate-200 mb-2">
                             No hay carreras disponibles
                           </p>
-                          <p className="text-sm text-slate-500">
+                          <p className="text-sm text-slate-400">
                             Selecciona un hipódromo en la pestaña Hipódromos
                           </p>
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {carrerasDelHipodromo.map((carrera) => {
                           const isSelected = selectedCarrera?.id === carrera.id;
                           return (
-                            <button
+                            <CarreraCard
                               key={`carrera-${carrera.id}`}
-                              onClick={() => handleSelectCarrera(carrera)}
-                              className={`w-full text-left p-4 rounded-xl transition-all duration-300 ${
-                                isSelected
-                                  ? "bg-gradient-to-br from-blue-400/30 to-slate-500/30 border-2 border-blue-400/50 shadow-lg shadow-slate-500/20 scale-[1.02]"
-                                  : "bg-slate-800/30 border border-slate-700/50 hover:bg-slate-800/50 hover:border-emerald-500/30"
-                              }`}>
-                              <div className="flex items-center justify-between mb-3">
-                                <span
-                                  className={`px-3 py-1.5 rounded-lg text-sm font-bold ${
-                                    isSelected
-                                      ? "bg-blue-500 text-white"
-                                      : "bg-emerald-500/20 text-emerald-400 border border-emerald-400/30"
-                                  }`}>
-                                  Carrera {carrera.num_carrera}
-                                </span>
-                                <div className="flex items-center gap-1.5 text-white font-semibold">
-                                  <Clock className="w-4 h-4" />
-                                  <span>{carrera.hora}</span>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-3 text-sm">
-                                <div className="flex items-center gap-2 text-slate-300">
-                                  <Users className="w-4 h-4 text-slate-400" />
-                                  <span>{carrera.caballos} caballos</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-slate-300">
-                                  <Calendar className="w-4 h-4 text-slate-400" />
-                                  <span>{carrera.fecha}</span>
-                                </div>
-                              </div>
-
-                              <div
-                                className={`mt-3 pt-3 border-t ${
-                                  isSelected
-                                    ? "border-blue-400/30"
-                                    : "border-slate-700/50"
-                                }`}>
-                                <div className="flex items-center gap-2">
-                                  <DollarSign
-                                    className={`w-4 h-4 ${
-                                      isSelected
-                                        ? "text-yellow-400"
-                                        : "text-emerald-400"
-                                    }`}
-                                  />
-                                  <span
-                                    className={`font-bold ${
-                                      isSelected
-                                        ? "text-yellow-300"
-                                        : "text-emerald-400"
-                                    }`}>
-                                    {parseFloat(
-                                      carrera.monto_vale
-                                    ).toLocaleString()}{" "}
-                                    USD
-                                  </span>
-                                </div>
-                              </div>
-                            </button>
+                              carrera={carrera}
+                              isSelected={isSelected}
+                              onSelect={handleSelectCarrera}
+                            />
                           );
                         })}
                       </div>
