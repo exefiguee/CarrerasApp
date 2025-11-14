@@ -246,10 +246,11 @@ const BetAmount = ({
                 key={amt}
                 onClick={() => onAmountChange(amt)}
                 disabled={loading}
-                className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${amount === amt
-                  ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white border-2 border-fuchsia-400"
-                  : "bg-slate-800/50 text-slate-300 border border-slate-700/50 hover:border-fuchsia-500/50"
-                  }`}>
+                className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  amount === amt
+                    ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white border-2 border-fuchsia-400"
+                    : "bg-slate-800/50 text-slate-300 border border-slate-700/50 hover:border-fuchsia-500/50"
+                }`}>
                 ${amt.toLocaleString()}
               </button>
             ))}
@@ -270,7 +271,7 @@ const BetAmount = ({
               </span>
             </div>
           </div>
-
+          {/* 
           <div className="bg-gradient-to-r from-fuchsia-500/20 to-fuchsia-600/20 border-2 border-fuchsia-500/40 rounded-xl p-4">
             <div className="flex justify-between items-center">
               <span className="text-slate-300 font-semibold">
@@ -280,7 +281,7 @@ const BetAmount = ({
                 ${potentialWin.toLocaleString()}
               </span>
             </div>
-          </div>
+          </div> */}
         </div>
       )}
 
@@ -295,9 +296,7 @@ const BetAmount = ({
               <p className="text-green-300 font-bold text-lg">
                 ¡Apuesta registrada exitosamente! 🎉
               </p>
-              <p className="text-green-400/80 text-sm">
-                Redirigiendo...
-              </p>
+              <p className="text-green-400/80 text-sm">Redirigiendo...</p>
             </div>
           </div>
         </div>
@@ -322,10 +321,11 @@ const BetAmount = ({
         <button
           onClick={handleConfirmBet}
           disabled={!canProceed || loading || success}
-          className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all ${canProceed && !loading && !success
-            ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 hover:from-fuchsia-500 hover:to-fuchsia-400 text-white shadow-lg shadow-fuchsia-500/30"
-            : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
-            }`}>
+          className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all ${
+            canProceed && !loading && !success
+              ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 hover:from-fuchsia-500 hover:to-fuchsia-400 text-white shadow-lg shadow-fuchsia-500/30"
+              : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
+          }`}>
           {loading ? (
             <>
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>

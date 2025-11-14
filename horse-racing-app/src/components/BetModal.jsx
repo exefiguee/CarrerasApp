@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   ChevronLeft,
@@ -13,24 +13,120 @@ import BetTypeSelector from "./BetTypeSelector";
 import HorseSelector from "./HorseSelector";
 import BetAmount from "./BetAmount";
 
-
 const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
   const [step, setStep] = useState(1);
   const [betType, setBetType] = useState(null);
   const [selectedHorses, setSelectedHorses] = useState([]);
   const [selectedRace, setSelectedRace] = useState([]);
   const [amount, setAmount] = useState(0);
+  const [betTypes, setBetTypes] = useState({});
+  const [loading, setLoading] = useState(true);
 
-  const betTypes = {
-    GANADOR: { label: "GANADOR", maxHorses: 1, minHorses: 1 },
-    SEGUNDO: { label: "SEGUNDO", maxHorses: 1, minHorses: 1 },
-    TERCERO: { label: "TERCERO", maxHorses: 1, minHorses: 1 },
-    EXACTA: { label: "EXACTA", maxHorses: 2, minHorses: 2 },
-    TRIFECTA_D: { label: "TRIFECTA D", maxHorses: 1, minHorses: 1 },
-    TIRA_1_2: { label: "TIRA(1,2)", maxHorses: 2, minHorses: 2 },
-    TIRA_1_2_3: { label: "TIRA(1,2,3)", maxHorses: 3, minHorses: 3 },
-    TRIFECTA_C: { label: "TRIFECTA C", maxHorses: 3, minHorses: 3 },
-  };
+  // 🔥 Orden CORRECTO de tipos de apuesta (del más simple al más complejo)
+  const BET_TYPE_ORDER = [
+    "GANADOR",
+    "SEGUNDO",
+    "TERCERO",
+    "EXACTA",
+    "IMPERFECTA",
+    "TIRA(1,2)",
+    "TIRA(1,2,3)",
+    "TRIFECTA D",
+    "TRIFECTA C",
+    "CUATRIFECTA D",
+    "CUATRIFECTA C",
+    "QUINTEX D",
+    "QUINTEX C",
+    "DOBLE",
+    "TRIPLO",
+    "PICK 4",
+    "PICK 5",
+    "PICK 6",
+  ];
+
+  // 🔥 Cargar tipos de apuesta DIRECTAMENTE desde race.tiposApuestas de Firestore
+  useEffect(() => {
+    if (!race || !race.tiposApuestas) {
+      console.warn("⚠️ No hay tiposApuestas en la carrera");
+      setLoading(false);
+      return;
+    }
+
+    console.log("📊 Datos de la carrera desde Firestore:", race);
+    console.log("🎯 tiposApuestas desde Firestore:", race.tiposApuestas);
+
+    // Mapeo de configuración para cada tipo de apuesta
+    const betTypeConfig = {
+      GANADOR: { maxHorses: 1, minHorses: 1, tope: 30000 },
+      SEGUNDO: { maxHorses: 1, minHorses: 1, tope: 15000 },
+      TERCERO: { maxHorses: 1, minHorses: 1, tope: 10000 },
+      "TIRA(1,2)": { maxHorses: 2, minHorses: 2, tope: 50000 },
+      "TIRA(1,2,3)": { maxHorses: 3, minHorses: 3, tope: 75000 },
+      EXACTA: { maxHorses: 2, minHorses: 2, tope: 75000 },
+      IMPERFECTA: { maxHorses: 2, minHorses: 2, tope: 50000 },
+      "TRIFECTA D": { maxHorses: 3, minHorses: 3, tope: 100000 },
+      "CUATRIFECTA D": { maxHorses: 4, minHorses: 4, tope: 150000 },
+      "QUINTEX D": { maxHorses: 5, minHorses: 5, tope: 200000 },
+      "TRIFECTA C": { maxHorses: 3, minHorses: 3, tope: 100000 },
+      "CUATRIFECTA C": { maxHorses: 4, minHorses: 4, tope: 150000 },
+      "QUINTEX C": { maxHorses: 5, minHorses: 5, tope: 200000 },
+      DOBLE: { maxHorses: 1, minHorses: 1, tope: 50000 },
+      TRIPLO: { maxHorses: 1, minHorses: 1, tope: 75000 },
+      "PICK 4": { maxHorses: 1, minHorses: 1, tope: 100000 },
+      "PICK 5": { maxHorses: 1, minHorses: 1, tope: 150000 },
+      "PICK 6": { maxHorses: 1, minHorses: 1, tope: 200000 },
+    };
+
+    // 🔥 Filtrar SOLO los tipos de apuesta que están en TRUE en Firestore
+    const enabledTypesTemp = {};
+
+    Object.entries(race.tiposApuestas).forEach(([key, isEnabled]) => {
+      console.log(`🔍 Verificando ${key}: ${isEnabled}`);
+
+      // Si está en FALSE, NO lo incluimos
+      if (isEnabled !== true) {
+        console.log(`❌ ${key} está en FALSE - NO se mostrará`);
+        return;
+      }
+
+      // Si está en TRUE y existe configuración, lo agregamos
+      if (betTypeConfig[key]) {
+        const normalizedKey = key.replace(/[(),\s]/g, "_").toUpperCase();
+        enabledTypesTemp[normalizedKey] = {
+          label: key,
+          originalKey: key, // 🔥 Guardar la clave original para ordenar
+          ...betTypeConfig[key],
+        };
+        console.log(`✅ ${key} está en TRUE - se mostrará`);
+      }
+    });
+
+    // 🔥 ORDENAR según BET_TYPE_ORDER
+    const orderedBetTypes = {};
+
+    BET_TYPE_ORDER.forEach((originalKey) => {
+      const normalizedKey = originalKey.replace(/[(),\s]/g, "_").toUpperCase();
+      if (enabledTypesTemp[normalizedKey]) {
+        orderedBetTypes[normalizedKey] = enabledTypesTemp[normalizedKey];
+      }
+    });
+
+    console.log(
+      "🎯 Tipos de apuesta HABILITADOS Y ORDENADOS:",
+      orderedBetTypes
+    );
+    console.log(
+      "📊 Total de tipos habilitados:",
+      Object.keys(orderedBetTypes).length
+    );
+    console.log(
+      "📋 Orden de tipos:",
+      Object.keys(orderedBetTypes).map((key) => orderedBetTypes[key].label)
+    );
+
+    setBetTypes(orderedBetTypes);
+    setLoading(false);
+  }, [race]);
 
   const handleBetTypeSelect = (type) => {
     console.log("🎯 Tipo de apuesta seleccionado:", type);
@@ -46,7 +142,11 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
   };
 
   const handleConfirmBet = () => {
-    console.log("✅ Confirmando apuesta con:", { betType, selectedHorses, amount });
+    console.log("✅ Confirmando apuesta con:", {
+      betType,
+      selectedHorses,
+      amount,
+    });
     onClose();
   };
 
@@ -101,47 +201,65 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
               </span>
             </div>
             <div className="text-xs text-slate-400">
-              {race.date || race.fecha} - {race.time || race.hora}
+              {race.date || race.fecha_texto} - {race.time || race.hora}
             </div>
           </div>
         </div>
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-220px)] custom-scrollbar">
-          {step === 1 && (
-            <BetTypeSelector
-              betTypes={betTypes}
-              onSelect={handleBetTypeSelect}
-            />
-          )}
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="w-12 h-12 border-4 border-fuchsia-500/30 border-t-fuchsia-500 rounded-full animate-spin mb-4"></div>
+              <p className="text-slate-400">Cargando tipos de apuesta...</p>
+            </div>
+          ) : Object.keys(betTypes).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Trophy className="w-16 h-16 text-slate-600 mb-4" />
+              <p className="text-slate-400 text-center">
+                No hay tipos de apuesta habilitados para esta carrera
+              </p>
+            </div>
+          ) : (
+            <>
+              {step === 1 && (
+                <BetTypeSelector
+                  betTypes={betTypes}
+                  onSelect={handleBetTypeSelect}
+                />
+              )}
 
-          {step === 2 && (
-            <HorseSelector
-              horses={race.horses}
-              betType={betType}
-              betTypeConfig={betTypes[betType]}
-              selectedHorses={selectedHorses}
-              onSelect={setSelectedHorses}
-              onBack={() => setStep(1)}
-              onNext={handleHorsesSelected}
-              canProceed={canProceed()}
-            />
-          )}
+              {step === 2 && (
+                <HorseSelector
+                  horses={race.horses}
+                  betType={betType}
+                  betTypeConfig={betTypes[betType]}
+                  selectedHorses={selectedHorses}
+                  onSelect={setSelectedHorses}
+                  onBack={() => setStep(1)}
+                  onNext={handleHorsesSelected}
+                  canProceed={canProceed()}
+                  race={race}
+                />
+              )}
 
-          {step === 3 && (
-            <BetAmount
-              selectedRace={selectedRace}
-              betType={betType}
-              selectedHorses={selectedHorses}
-              amount={amount}
-              onAmountChange={setAmount}
-              onBack={() => setStep(2)}
-              onConfirm={handleConfirmBet}
-              canProceed={canProceed()}
-              raceData={race}
-              user={user}
-              userSaldo={userSaldo}
-            />
+              {step === 3 && (
+                <BetAmount
+                  selectedRace={selectedRace}
+                  betType={betType}
+                  selectedHorses={selectedHorses}
+                  amount={amount}
+                  onAmountChange={setAmount}
+                  onBack={() => setStep(2)}
+                  onConfirm={handleConfirmBet}
+                  canProceed={canProceed()}
+                  raceData={race}
+                  user={user}
+                  userSaldo={userSaldo}
+                  maxBetAmount={betTypes[betType]?.tope}
+                />
+              )}
+            </>
           )}
         </div>
 

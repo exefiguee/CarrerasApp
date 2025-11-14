@@ -12,7 +12,8 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
-import betService from "../services/betService";
+import { db } from "../firebase/config";
+import { collection, query, onSnapshot } from "firebase/firestore";
 
 const UserBets = ({ userId }) => {
   const [bets, setBets] = useState([]);
@@ -21,21 +22,50 @@ const UserBets = ({ userId }) => {
   const [filter, setFilter] = useState("TODOS");
 
   useEffect(() => {
-    loadBets();
+    if (!userId) return;
+
+    const betsRef = collection(db, "USUARIOS", userId, "APUESTAS");
+    const q = query(betsRef);
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const userBets = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setBets(userBets);
+        updateStats(userBets);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error al escuchar apuestas:", error);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, [userId]);
 
-  const loadBets = async () => {
-    setLoading(true);
-    try {
-      const userBets = await betService.getUserBets(userId);
-      const userStats = await betService.getUserBetStats(userId);
-      setBets(userBets);
-      setStats(userStats);
-    } catch (error) {
-      console.error("Error al cargar apuestas:", error);
-    } finally {
-      setLoading(false);
-    }
+  const updateStats = (bets) => {
+    const total = bets.length;
+    const pendientes = bets.filter((b) => b.estado === "PENDIENTE").length;
+    const ganadas = bets.filter((b) => b.estado === "GANADA").length;
+    const perdidas = bets.filter((b) => b.estado === "PERDIDA").length;
+    const totalApostado = bets.reduce(
+      (sum, b) => sum + (b.montoApostado || 0),
+      0
+    );
+    const totalGanado = bets.reduce((sum, b) => sum + (b.gananciaReal || 0), 0);
+
+    setStats({
+      total,
+      pendientes,
+      ganadas,
+      perdidas,
+      totalApostado,
+      totalGanado,
+    });
   };
 
   const getStatusConfig = (estado) => {
@@ -72,16 +102,72 @@ const UserBets = ({ userId }) => {
     return configs[estado] || configs.PENDIENTE;
   };
 
+  // ✅ Función mejorada para formatear timestamp
   const formatDate = (timestamp) => {
     if (!timestamp) return "Fecha desconocida";
-    const date = new Date(timestamp);
-    return date.toLocaleDateString("es-AR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleDateString("es-AR", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (error) {
+      console.error("Error al formatear fecha:", error);
+      return "Fecha inválida";
+    }
+  };
+
+  // ✅ Nueva función para formatear la fecha de la carrera (Timestamp de Firestore)
+  const formatRaceDate = (fechaTimestamp) => {
+    if (!fechaTimestamp) return "Sin fecha";
+
+    try {
+      // Si es un Timestamp de Firestore
+      if (
+        fechaTimestamp.toDate &&
+        typeof fechaTimestamp.toDate === "function"
+      ) {
+        const date = fechaTimestamp.toDate();
+        return date.toLocaleDateString("es-AR", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      }
+
+      // Si es un timestamp numérico
+      if (typeof fechaTimestamp === "number") {
+        const date = new Date(fechaTimestamp);
+        return date.toLocaleDateString("es-AR", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      }
+
+      // Si es una cadena de fecha
+      if (typeof fechaTimestamp === "string") {
+        const date = new Date(fechaTimestamp);
+        return date.toLocaleDateString("es-AR", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      }
+
+      return "Fecha no disponible";
+    } catch (error) {
+      console.error(
+        "Error al formatear fecha de carrera:",
+        error,
+        fechaTimestamp
+      );
+      return "Fecha inválida";
+    }
   };
 
   const filteredBets = bets.filter(
@@ -110,60 +196,15 @@ const UserBets = ({ userId }) => {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-white">Mis Apuestas</h1>
-              <p className="text-slate-400">
-                Historial completo de tus apuestas
-              </p>
+              <p className="text-slate-400">Actualizadas en vivo 🔥</p>
             </div>
           </div>
           <button
-            onClick={loadBets}
+            onClick={() => setLoading(true)}
             className="p-3 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-slate-300 transition-all">
             <RefreshCw className="w-5 h-5" />
           </button>
         </div>
-
-        {/* Estadísticas */}
-        {/* {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-slate-700/50 rounded-xl p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <Trophy className="w-5 h-5 text-fuchsia-400" />
-                <span className="text-slate-400 text-sm">Total Apuestas</span>
-              </div>
-              <p className="text-2xl font-bold text-white">{stats.total}</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border border-yellow-500/30 rounded-xl p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <Clock className="w-5 h-5 text-yellow-400" />
-                <span className="text-slate-400 text-sm">Pendientes</span>
-              </div>
-              <p className="text-2xl font-bold text-yellow-300">
-                {stats.pendientes}
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-xl p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <CheckCircle className="w-5 h-5 text-green-400" />
-                <span className="text-slate-400 text-sm">Ganadas</span>
-              </div>
-              <p className="text-2xl font-bold text-green-300">
-                {stats.ganadas}
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-red-500/10 to-rose-500/10 border border-red-500/30 rounded-xl p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <XCircle className="w-5 h-5 text-red-400" />
-                <span className="text-slate-400 text-sm">Perdidas</span>
-              </div>
-              <p className="text-2xl font-bold text-red-300">
-                {stats.perdidas}
-              </p>
-            </div>
-          </div>
-        )} */}
 
         {/* Resumen financiero */}
         {stats && (
@@ -199,7 +240,7 @@ const UserBets = ({ userId }) => {
         )}
 
         {/* Filtros */}
-        {/* <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="flex gap-2 overflow-x-auto pb-2 justify-center">
           {["TODOS", "PENDIENTE", "GANADA", "PERDIDA"].map((status) => (
             <button
               key={status}
@@ -212,7 +253,7 @@ const UserBets = ({ userId }) => {
               {status === "TODOS" ? "Todas" : status}
             </button>
           ))}
-        </div> */}
+        </div>
 
         {/* Lista de apuestas */}
         <div className="space-y-4">
@@ -237,15 +278,17 @@ const UserBets = ({ userId }) => {
                 <div
                   key={bet.id}
                   className={`bg-gradient-to-br ${statusConfig.bg} border-2 ${statusConfig.border} rounded-xl p-5 space-y-4 hover:shadow-xl transition-all`}>
-                  {/* Header de la apuesta */}
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
                       <div
                         className={`p-2 rounded-lg bg-slate-800/50 border ${statusConfig.border}`}>
-                        <StatusIcon className={`w-5 h-5 ${statusConfig.text}`} />
+                        <StatusIcon
+                          className={`w-5 h-5 ${statusConfig.text}`}
+                        />
                       </div>
                       <div>
-                        <h3 className={`font-bold text-lg ${statusConfig.text}`}>
+                        <h3
+                          className={`font-bold text-lg ${statusConfig.text}`}>
                           {bet.tipoApuesta}
                         </h3>
                         <p className="text-slate-400 text-sm">
@@ -259,7 +302,6 @@ const UserBets = ({ userId }) => {
                     </div>
                   </div>
 
-                  {/* Detalles de la carrera */}
                   <div className="grid md:grid-cols-3 gap-3">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-slate-400" />
@@ -286,30 +328,31 @@ const UserBets = ({ userId }) => {
                       <div>
                         <p className="text-slate-500 text-xs">Fecha</p>
                         <p className="text-white font-semibold text-sm">
-                          {bet.fecha} • {bet.hora}
+                          {/* ✅ CORRECCIÓN: Usar formatRaceDate para el Timestamp */}
+                          {formatRaceDate(bet.fecha)} • {bet.hora || "00:00"}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Caballos seleccionados */}
                   <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50">
                     <p className="text-slate-400 text-xs mb-2">
                       Caballos apostados:
                     </p>
-                    <p className="text-white font-semibold">{bet.caballosTexto}</p>
+                    <p className="text-white font-semibold">
+                      {bet.caballosTexto || "No disponible"}
+                    </p>
                   </div>
 
-                  {/* Montos */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50">
                       <p className="text-slate-400 text-xs mb-1">Apostado</p>
                       <p className="text-fuchsia-300 font-bold text-xl">
-                        ${bet.montoApostado.toLocaleString()}
+                        ${bet.montoApostado?.toLocaleString() || "0"}
                       </p>
                     </div>
 
-                    <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50">
+                    {/* <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50">
                       <p className="text-slate-400 text-xs mb-1">
                         {bet.estado === "GANADA"
                           ? "Ganancia Real"
@@ -323,10 +366,12 @@ const UserBets = ({ userId }) => {
                         }`}>
                         $
                         {(
-                          bet.gananciaReal || bet.gananciaPotencial
+                          bet.gananciaReal ||
+                          bet.gananciaPotencial ||
+                          0
                         ).toLocaleString()}
                       </p>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               );

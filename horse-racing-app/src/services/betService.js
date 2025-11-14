@@ -35,6 +35,31 @@ const cleanFirestoreData = (obj) => {
   return obj;
 };
 
+// ✅ Función helper para convertir fecha a Timestamp de forma segura
+const toFirestoreTimestamp = (dateValue) => {
+  if (!dateValue) return Timestamp.now();
+
+  // Si ya es un Timestamp de Firestore
+  if (dateValue instanceof Timestamp) {
+    return dateValue;
+  }
+
+  // Intentar crear Date
+  const date = new Date(dateValue);
+
+  // Validar que la fecha sea válida
+  if (isNaN(date.getTime())) {
+    console.warn(
+      "⚠️ Fecha inválida recibida:",
+      dateValue,
+      "- usando fecha actual"
+    );
+    return Timestamp.now();
+  }
+
+  return Timestamp.fromDate(date);
+};
+
 const betService = {
   // Calcular ganancia potencial
   calculatePotentialWin: (betType, selectedHorses, amount) => {
@@ -53,7 +78,7 @@ const betService = {
     return Math.floor(amount * multiplier);
   },
 
-// Crear apuesta en Firebase
+  // Crear apuesta en Firebase
   createBet: async (userId, betData, userSaldo) => {
     try {
       // Validar que el usuario tenga saldo suficiente
@@ -79,9 +104,15 @@ const betService = {
       // ✅ Preparar caballos seleccionados ANTES de validar otros campos
       const caballosSeleccionados = horsesArray.map((horse) => {
         const numero = Number(horse.number) || Number(horse.numero) || 0;
-        const nombre = String(horse.name || horse.nombre || `CABALLO ${numero}`);
+        const nombre = String(
+          horse.name || horse.nombre || `CABALLO ${numero}`
+        );
 
-        console.log("🐴 Procesando caballo:", { original: horse, numero, nombre });
+        console.log("🐴 Procesando caballo:", {
+          original: horse,
+          numero,
+          nombre,
+        });
 
         return {
           numero: numero,
@@ -104,7 +135,10 @@ const betService = {
       );
       const carreraId = String(betData.carreraId || "");
       const numeroCarrera = Number(betData.numeroCarrera) || 0;
-      const fecha = String(betData.fecha || new Date().toISOString().split("T")[0]);
+
+      // ✅ CORRECCIÓN: Usar helper seguro para convertir fecha
+      const fecha = toFirestoreTimestamp(betData.fecha);
+
       const hora = String(betData.hora || "00:00");
       const tipoApuesta = String(betData.betType || "");
       const montoApostado = Number(betData.amount) || 0;
@@ -142,10 +176,16 @@ const betService = {
         timestamp: Date.now(),
       };
 
-      console.log("🔥 Datos FINALES para Firestore:", JSON.stringify(apuestaData, null, 2));
+      console.log(
+        "🔥 Datos FINALES para Firestore:",
+        JSON.stringify(apuestaData, null, 2)
+      );
 
       // ✅ Verificación final
-      if (!apuestaData.caballosSeleccionados || apuestaData.caballosSeleccionados.length === 0) {
+      if (
+        !apuestaData.caballosSeleccionados ||
+        apuestaData.caballosSeleccionados.length === 0
+      ) {
         throw new Error("Error: no hay caballos seleccionados");
       }
 
@@ -177,7 +217,7 @@ const betService = {
       };
     }
   },
-  
+
   getUserBets: async (userId) => {
     try {
       const apuestasRef = collection(db, "USUARIOS", userId, "APUESTAS");
@@ -239,7 +279,8 @@ const betService = {
 
       const updateData = {
         estado: nuevoEstado,
-        fechaActualizacion: new Date().toISOString(),
+        // ✅ CORRECCIÓN: Usar Timestamp en lugar de ISO string
+        fechaActualizacion: Timestamp.now(),
       };
 
       // Si la apuesta fue ganada, actualizar ganancia real y saldo del usuario
@@ -276,7 +317,8 @@ const betService = {
       // Actualizar estado a CANCELADA
       await updateDoc(apuestaRef, {
         estado: "CANCELADA",
-        fechaCancelacion: new Date().toISOString(),
+        // ✅ CORRECCIÓN: Usar Timestamp en lugar de ISO string
+        fechaCancelacion: Timestamp.now(),
       });
 
       // Devolver el monto al saldo del usuario
