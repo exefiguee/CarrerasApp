@@ -13,19 +13,49 @@ const BetAmount = ({
   raceData,
   user,
   userSaldo,
+  maxBetAmount, // 🔥 Límite máximo desde Firestore
+  minBetAmount, // 🔥 Límite mínimo desde Firestore
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const minAmount = 200;
-  const maxAmount = 50000;
-  const quickAmounts = [200, 500, 1000, 2000, 5000, 10000];
+  // 🔥 Usar límites dinámicos desde Firestore
+  const minAmount = minBetAmount || 200;
+  const maxAmount = maxBetAmount || 50000;
+
+  // 🔥 Generar montos rápidos dinámicamente según los límites
+  const generateQuickAmounts = () => {
+    const amounts = [];
+    const baseAmounts = [
+      200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 150000, 200000,
+    ];
+
+    // Filtrar solo los que están dentro del rango
+    const validAmounts = baseAmounts.filter(
+      (amt) => amt >= minAmount && amt <= maxAmount
+    );
+
+    // Si no hay suficientes montos, generar algunos intermedios
+    if (validAmounts.length < 3) {
+      const step = Math.floor((maxAmount - minAmount) / 4);
+      for (let i = 0; i <= 4; i++) {
+        const amt = minAmount + step * i;
+        if (amt <= maxAmount && !validAmounts.includes(amt)) {
+          validAmounts.push(amt);
+        }
+      }
+      validAmounts.sort((a, b) => a - b);
+    }
+
+    return validAmounts.slice(0, 6); // Máximo 6 montos rápidos
+  };
+
+  const quickAmounts = generateQuickAmounts();
 
   // 🔍 Debug: Ver qué caballos llegan
   console.log("🐴 selectedHorses en BetAmount:", selectedHorses);
-  console.log("🐴 Tipo:", typeof selectedHorses);
-  console.log("🐴 Es array?:", Array.isArray(selectedHorses));
+  console.log("💰 Límites de apuesta - Min:", minAmount, "Max:", maxAmount);
 
   const potentialWin = betService.calculatePotentialWin(
     betType,
@@ -36,6 +66,22 @@ const BetAmount = ({
   const handleAmountInput = (value) => {
     setError("");
     const numValue = parseInt(value) || 0;
+
+    // 🔥 Validar según límites de Firestore en tiempo real
+    if (numValue > maxAmount) {
+      setError(
+        `El monto máximo para esta apuesta es ${maxAmount.toLocaleString()}`
+      );
+      onAmountChange(maxAmount); // Ajustar al máximo permitido
+      return;
+    }
+
+    if (numValue > 0 && numValue < minAmount) {
+      setError(
+        `El monto mínimo para esta apuesta es ${minAmount.toLocaleString()}`
+      );
+    }
+
     onAmountChange(Math.min(Math.max(numValue, 0), maxAmount));
   };
 
@@ -74,6 +120,21 @@ const BetAmount = ({
     if (!selectedHorses || selectedHorses.length === 0) {
       setError("⚠️ Debes seleccionar al menos un caballo");
       console.error("❌ No hay caballos seleccionados:", selectedHorses);
+      return;
+    }
+
+    // 🔥 Validar límites de apuesta desde Firestore
+    if (amount < minAmount) {
+      setError(
+        `El monto mínimo para esta apuesta es $${minAmount.toLocaleString()}`
+      );
+      return;
+    }
+
+    if (amount > maxAmount) {
+      setError(
+        `El monto máximo para esta apuesta es $${maxAmount.toLocaleString()}`
+      );
       return;
     }
 
@@ -190,6 +251,18 @@ const BetAmount = ({
         </div>
       </div>
 
+      {/* 🔥 Mostrar límites de apuesta desde Firestore */}
+      {/* <div className="bg-gradient-to-r from-amber-500/20 to-slate-800/40 border border-amber-500/30 rounded-xl p-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-amber-300 font-semibold">
+            💰 Límites de apuesta:
+          </span>
+          <span className="text-amber-200">
+            ${minAmount.toLocaleString()} - ${maxAmount.toLocaleString()}
+          </span>
+        </div>
+      </div> */}
+
       {/* Saldo disponible */}
       <div className="bg-gradient-to-r from-fuchsia-500/20 to-slate-800/40 border border-fuchsia-500/30 rounded-xl p-4">
         <div className="flex items-center justify-between">
@@ -236,26 +309,28 @@ const BetAmount = ({
         </label>
 
         {/* Montos rápidos */}
-        <div>
-          <span className="text-slate-400 text-sm mb-2 block">
-            Montos rápidos:
-          </span>
-          <div className="grid grid-cols-3 gap-2">
-            {quickAmounts.map((amt) => (
-              <button
-                key={amt}
-                onClick={() => onAmountChange(amt)}
-                disabled={loading}
-                className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                  amount === amt
-                    ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white border-2 border-fuchsia-400"
-                    : "bg-slate-800/50 text-slate-300 border border-slate-700/50 hover:border-fuchsia-500/50"
-                }`}>
-                ${amt.toLocaleString()}
-              </button>
-            ))}
+        {quickAmounts.length > 0 && (
+          <div>
+            <span className="text-slate-400 text-sm mb-2 block">
+              Montos rápidos:
+            </span>
+            <div className="grid grid-cols-3 gap-2">
+              {quickAmounts.slice(0, 6).map((amt) => (
+                <button
+                  key={amt}
+                  onClick={() => onAmountChange(amt)}
+                  disabled={loading}
+                  className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    amount === amt
+                      ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white border-2 border-fuchsia-400"
+                      : "bg-slate-800/50 text-slate-300 border border-slate-700/50 hover:border-fuchsia-500/50"
+                  }`}>
+                  ${amt.toLocaleString()}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Total y Ganancia Potencial */}
@@ -271,17 +346,6 @@ const BetAmount = ({
               </span>
             </div>
           </div>
-          {/* 
-          <div className="bg-gradient-to-r from-fuchsia-500/20 to-fuchsia-600/20 border-2 border-fuchsia-500/40 rounded-xl p-4">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-300 font-semibold">
-                Ganancia Potencial:
-              </span>
-              <span className="text-3xl font-bold text-fuchsia-300">
-                ${potentialWin.toLocaleString()}
-              </span>
-            </div>
-          </div> */}
         </div>
       )}
 

@@ -54,27 +54,28 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
 
     console.log("📊 Datos de la carrera desde Firestore:", race);
     console.log("🎯 tiposApuestas desde Firestore:", race.tiposApuestas);
+    console.log("💰 limitesApuestas desde Firestore:", race.limitesApuestas);
 
     // Mapeo de configuración para cada tipo de apuesta
     const betTypeConfig = {
-      GANADOR: { maxHorses: 1, minHorses: 1, tope: 30000 },
-      SEGUNDO: { maxHorses: 1, minHorses: 1, tope: 15000 },
-      TERCERO: { maxHorses: 1, minHorses: 1, tope: 10000 },
-      "TIRA(1,2)": { maxHorses: 2, minHorses: 2, tope: 50000 },
-      "TIRA(1,2,3)": { maxHorses: 3, minHorses: 3, tope: 75000 },
-      EXACTA: { maxHorses: 2, minHorses: 2, tope: 75000 },
-      IMPERFECTA: { maxHorses: 2, minHorses: 2, tope: 50000 },
-      "TRIFECTA D": { maxHorses: 3, minHorses: 3, tope: 100000 },
-      "CUATRIFECTA D": { maxHorses: 4, minHorses: 4, tope: 150000 },
-      "QUINTEX D": { maxHorses: 5, minHorses: 5, tope: 200000 },
-      "TRIFECTA C": { maxHorses: 3, minHorses: 3, tope: 100000 },
-      "CUATRIFECTA C": { maxHorses: 4, minHorses: 4, tope: 150000 },
-      "QUINTEX C": { maxHorses: 5, minHorses: 5, tope: 200000 },
-      DOBLE: { maxHorses: 1, minHorses: 1, tope: 50000 },
-      TRIPLO: { maxHorses: 1, minHorses: 1, tope: 75000 },
-      "PICK 4": { maxHorses: 1, minHorses: 1, tope: 100000 },
-      "PICK 5": { maxHorses: 1, minHorses: 1, tope: 150000 },
-      "PICK 6": { maxHorses: 1, minHorses: 1, tope: 200000 },
+      GANADOR: { maxHorses: 1, minHorses: 1 },
+      SEGUNDO: { maxHorses: 1, minHorses: 1 },
+      TERCERO: { maxHorses: 1, minHorses: 1 },
+      "TIRA(1,2)": { maxHorses: 2, minHorses: 2 },
+      "TIRA(1,2,3)": { maxHorses: 3, minHorses: 3 },
+      EXACTA: { maxHorses: 2, minHorses: 2 },
+      IMPERFECTA: { maxHorses: 2, minHorses: 2 },
+      "TRIFECTA D": { maxHorses: 3, minHorses: 3 },
+      "CUATRIFECTA D": { maxHorses: 4, minHorses: 4 },
+      "QUINTEX D": { maxHorses: 5, minHorses: 5 },
+      "TRIFECTA C": { maxHorses: 3, minHorses: 3 },
+      "CUATRIFECTA C": { maxHorses: 4, minHorses: 4 },
+      "QUINTEX C": { maxHorses: 5, minHorses: 5 },
+      DOBLE: { maxHorses: 1, minHorses: 1 },
+      TRIPLO: { maxHorses: 1, minHorses: 1 },
+      "PICK 4": { maxHorses: 1, minHorses: 1 },
+      "PICK 5": { maxHorses: 1, minHorses: 1 },
+      "PICK 6": { maxHorses: 1, minHorses: 1 },
     };
 
     // 🔥 Filtrar SOLO los tipos de apuesta que están en TRUE en Firestore
@@ -92,12 +93,28 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
       // Si está en TRUE y existe configuración, lo agregamos
       if (betTypeConfig[key]) {
         const normalizedKey = key.replace(/[(),\s]/g, "_").toUpperCase();
+
+        // 🔥 Convertir la clave para buscar en limitesApuestas
+        // Ejemplo: "TRIFECTA D" -> "TRIFECTAD1"
+        const keyWithOne = key.replace(/\s/g, "") + "1";
+
+        // 🔥 Buscar límites desde limitesApuestas
+        const limites = race.limitesApuestas?.[keyWithOne] || {
+          apuestaMinima: 200,
+          apuestaMaxima: 50000,
+        };
+
         enabledTypesTemp[normalizedKey] = {
           label: key,
-          originalKey: key, // 🔥 Guardar la clave original para ordenar
+          originalKey: key,
           ...betTypeConfig[key],
+          apuestaMinima: limites.apuestaMinima || 200,
+          apuestaMaxima: limites.apuestaMaxima || 50000,
         };
-        console.log(`✅ ${key} está en TRUE - se mostrará`);
+        console.log(
+          `✅ ${key} está en TRUE - se mostrará con límites:`,
+          limites
+        );
       }
     });
 
@@ -120,8 +137,12 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
       Object.keys(orderedBetTypes).length
     );
     console.log(
-      "📋 Orden de tipos:",
-      Object.keys(orderedBetTypes).map((key) => orderedBetTypes[key].label)
+      "📋 Orden de tipos con límites:",
+      Object.keys(orderedBetTypes).map((key) => ({
+        tipo: orderedBetTypes[key].label,
+        min: orderedBetTypes[key].apuestaMinima,
+        max: orderedBetTypes[key].apuestaMaxima,
+      }))
     );
 
     setBetTypes(orderedBetTypes);
@@ -159,7 +180,12 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
       );
     }
     if (step === 3) {
-      return amount >= 200 && amount <= 50000 && amount <= (userSaldo || 0);
+      const config = betTypes[betType];
+      const minAmount = config?.apuestaMinima || 200;
+      const maxAmount = config?.apuestaMaxima || 50000;
+      return (
+        amount >= minAmount && amount <= maxAmount && amount <= (userSaldo || 0)
+      );
     }
     return true;
   };
@@ -256,7 +282,8 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
                   raceData={race}
                   user={user}
                   userSaldo={userSaldo}
-                  maxBetAmount={betTypes[betType]?.tope}
+                  maxBetAmount={betTypes[betType]?.apuestaMaxima}
+                  minBetAmount={betTypes[betType]?.apuestaMinima}
                 />
               )}
             </>

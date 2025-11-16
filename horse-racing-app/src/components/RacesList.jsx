@@ -422,6 +422,28 @@ const RacesList = ({ onSelectRace }) => {
     };
   };
 
+  const crearLimitesApuestasDefault = () => {
+    return {
+      GANADOR1: { apuestaMinima: 200, apuestaMaxima: 30000 },
+      SEGUNDO1: { apuestaMinima: 200, apuestaMaxima: 15000 },
+      TERCERO1: { apuestaMinima: 200, apuestaMaxima: 10000 },
+      "TIRA(1,2)1": { apuestaMinima: 200, apuestaMaxima: 50000 },
+      "TIRA(1,2,3)1": { apuestaMinima: 200, apuestaMaxima: 75000 },
+      EXACTA1: { apuestaMinima: 200, apuestaMaxima: 75000 },
+      IMPERFECTA1: { apuestaMinima: 200, apuestaMaxima: 50000 },
+      TRIFECTAD1: { apuestaMinima: 200, apuestaMaxima: 100000 },
+      CUATRIFECTAD1: { apuestaMinima: 200, apuestaMaxima: 150000 },
+      QUINTEXD1: { apuestaMinima: 200, apuestaMaxima: 200000 },
+      TRIFECTAC1: { apuestaMinima: 200, apuestaMaxima: 100000 },
+      CUATRIFECTAC1: { apuestaMinima: 200, apuestaMaxima: 150000 },
+      QUINTEXC1: { apuestaMinima: 200, apuestaMaxima: 200000 },
+      DOBLE1: { apuestaMinima: 200, apuestaMaxima: 50000 },
+      TRIPLO1: { apuestaMinima: 200, apuestaMaxima: 75000 },
+      PICK41: { apuestaMinima: 200, apuestaMaxima: 100000 },
+      PICK51: { apuestaMinima: 200, apuestaMaxima: 150000 },
+      PICK61: { apuestaMinima: 200, apuestaMaxima: 200000 },
+    };
+  };
   const guardarCarrerasEnFirestore = async (jsonData) => {
     try {
       if (!jsonData || !jsonData.carreras) return;
@@ -474,6 +496,7 @@ const RacesList = ({ onSelectRace }) => {
           caballitos: crearMapaCaballitos(carrera.caballos),
           seJuega: true,
           tiposApuestas: crearTiposApuestasDefault(),
+          limitesApuestas: crearLimitesApuestasDefault(),
         };
 
         const limpio = Object.fromEntries(
