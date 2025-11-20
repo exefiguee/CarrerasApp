@@ -1,6 +1,15 @@
-import { useState } from "react";
-import { Trophy, ChevronLeft, Check, DollarSign, Wallet } from "lucide-react";
+import { useState, useEffect } from "react";
+import {
+  Trophy,
+  ChevronLeft,
+  Check,
+  DollarSign,
+  Wallet,
+  Ticket,
+} from "lucide-react";
 import betService from "../services/betService";
+import { db } from "../firebase/config";
+import { doc, onSnapshot } from "firebase/firestore";
 
 const BetAmount = ({
   betType,
@@ -13,49 +22,106 @@ const BetAmount = ({
   raceData,
   user,
   userSaldo,
-  maxBetAmount, // 🔥 Límite máximo desde Firestore
-  minBetAmount, // 🔥 Límite mínimo desde Firestore
+  maxBetAmount,
+  minBetAmount,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [currentSaldo, setCurrentSaldo] = useState(userSaldo);
 
-  // 🔥 Usar límites dinámicos desde Firestore
   const minAmount = minBetAmount || 200;
   const maxAmount = maxBetAmount || 50000;
 
-  // 🔥 Generar montos rápidos dinámicamente según los límites
+  // 🎯 Tipos de apuesta que NO usan sistema de vales
+  const tiposSinVales = ["GANADOR", "SEGUNDO", "TERCERO"];
+  const usaVales = !tiposSinVales.includes(betType);
+
+  // 🎯 Obtener el dividendo de la carrera (por defecto 100)
+  const dividendo = raceData?.dividendo || 100;
+
+  // 💰 Calcular VALES: Monto apostado ÷ Dividendo (solo si aplica)
+  const calcularVales = (monto) => {
+    if (!usaVales || !monto || monto <= 0) return 0;
+    return Math.floor(monto / dividendo);
+  };
+
+  const valesApostados = calcularVales(amount);
+
+  // 🔥 Listener en tiempo real para el saldo del usuario
+  useEffect(() => {
+    if (!user || !user.uid) {
+      return;
+    }
+
+    console.log(
+      "🔥 Iniciando listener en tiempo real para saldo del usuario:",
+      user.uid
+    );
+
+    const userRef = doc(db, "USUARIOS", user.uid);
+
+    const unsubscribe = onSnapshot(
+      userRef,
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const userData = docSnapshot.data();
+          const nuevoSaldo = userData.SALDO || 0;
+
+          console.log("🔄 Saldo actualizado en tiempo real:", nuevoSaldo);
+          setCurrentSaldo(nuevoSaldo);
+
+          // Si el nuevo saldo es menor al monto actual, validar
+          if (amount > nuevoSaldo) {
+            setError(
+              `Tu saldo actual es $${nuevoSaldo.toLocaleString()}. Ajusta el monto de tu apuesta.`
+            );
+          }
+        }
+      },
+      (error) => {
+        console.error("❌ Error en listener de saldo:", error);
+      }
+    );
+
+    // Limpiar el listener cuando el componente se desmonte
+    return () => {
+      console.log("🛑 Deteniendo listener de saldo");
+      unsubscribe();
+    };
+  }, [user?.uid, amount]);
+
   const generateQuickAmounts = () => {
     const amounts = [];
     const baseAmounts = [
       200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 150000, 200000,
     ];
 
-    // Filtrar solo los que están dentro del rango
     const validAmounts = baseAmounts.filter(
-      (amt) => amt >= minAmount && amt <= maxAmount
+      (amt) => amt >= minAmount && amt <= maxAmount && amt <= currentSaldo
     );
 
-    // Si no hay suficientes montos, generar algunos intermedios
     if (validAmounts.length < 3) {
-      const step = Math.floor((maxAmount - minAmount) / 4);
+      const step = Math.floor(
+        (Math.min(maxAmount, currentSaldo) - minAmount) / 4
+      );
       for (let i = 0; i <= 4; i++) {
         const amt = minAmount + step * i;
-        if (amt <= maxAmount && !validAmounts.includes(amt)) {
+        if (
+          amt <= maxAmount &&
+          amt <= currentSaldo &&
+          !validAmounts.includes(amt)
+        ) {
           validAmounts.push(amt);
         }
       }
       validAmounts.sort((a, b) => a - b);
     }
 
-    return validAmounts.slice(0, 6); // Máximo 6 montos rápidos
+    return validAmounts.slice(0, 6);
   };
 
   const quickAmounts = generateQuickAmounts();
-
-  // 🔍 Debug: Ver qué caballos llegan
-  console.log("🐴 selectedHorses en BetAmount:", selectedHorses);
-  console.log("💰 Límites de apuesta - Min:", minAmount, "Max:", maxAmount);
 
   const potentialWin = betService.calculatePotentialWin(
     betType,
@@ -67,30 +133,37 @@ const BetAmount = ({
     setError("");
     const numValue = parseInt(value) || 0;
 
-    // 🔥 Validar según límites de Firestore en tiempo real
+    if (numValue > currentSaldo) {
+      setError(
+        `Tu saldo actual es $${currentSaldo.toLocaleString()}. No puedes apostar más de lo que tienes.`
+      );
+      onAmountChange(Math.min(currentSaldo, maxAmount));
+      return;
+    }
+
     if (numValue > maxAmount) {
       setError(
-        `El monto máximo para esta apuesta es ${maxAmount.toLocaleString()}`
+        `El monto máximo para esta apuesta es $${maxAmount.toLocaleString()}`
       );
-      onAmountChange(maxAmount); // Ajustar al máximo permitido
+      onAmountChange(maxAmount);
       return;
     }
 
     if (numValue > 0 && numValue < minAmount) {
       setError(
-        `El monto mínimo para esta apuesta es ${minAmount.toLocaleString()}`
+        `El monto mínimo para esta apuesta es $${minAmount.toLocaleString()}`
       );
     }
 
-    onAmountChange(Math.min(Math.max(numValue, 0), maxAmount));
+    onAmountChange(
+      Math.min(Math.max(numValue, 0), Math.min(maxAmount, currentSaldo))
+    );
   };
 
-  // ✅ Función para limpiar undefined y convertir a valores válidos
   const cleanBetData = (data) => {
     const cleaned = {};
     for (const [key, value] of Object.entries(data)) {
       if (value === undefined) {
-        // Convertir undefined según el tipo de campo
         if (
           key === "amount" ||
           key === "potentialWin" ||
@@ -116,14 +189,11 @@ const BetAmount = ({
       return;
     }
 
-    // ✅ Validar que selectedHorses tenga datos
     if (!selectedHorses || selectedHorses.length === 0) {
       setError("⚠️ Debes seleccionar al menos un caballo");
-      console.error("❌ No hay caballos seleccionados:", selectedHorses);
       return;
     }
 
-    // 🔥 Validar límites de apuesta desde Firestore
     if (amount < minAmount) {
       setError(
         `El monto mínimo para esta apuesta es $${minAmount.toLocaleString()}`
@@ -138,18 +208,20 @@ const BetAmount = ({
       return;
     }
 
-    // Convertir selectedHorses a array si no lo es
+    if (amount > currentSaldo) {
+      setError(
+        `Tu saldo actual es $${currentSaldo.toLocaleString()}. No puedes apostar más de lo que tienes.`
+      );
+      return;
+    }
+
     const horsesArray = Array.isArray(selectedHorses)
       ? selectedHorses
       : [selectedHorses];
 
-    console.log("🐴 Caballos seleccionados ANTES de validar:", horsesArray);
-    console.log("🐴 Cantidad de caballos:", horsesArray.length);
-
-    // Validar apuesta
     const validation = betService.validateBet(
       { amount, selectedHorses: horsesArray },
-      userSaldo
+      currentSaldo
     );
 
     if (!validation.isValid) {
@@ -166,13 +238,10 @@ const BetAmount = ({
         raceData?.venue ||
         "Hipódromo desconocido";
 
-      console.log("📊 Race Data completa:", raceData);
-      console.log("🏟️ Nombre del hipódromo:", hipodromoNombre);
-
       const betDataRaw = {
         hipodromoId: raceData?.id_hipodromo || "",
         hipodromoNombre: hipodromoNombre,
-        carreraId: raceData?.id || "",
+        carreraId: raceData?.id || raceData?.firebaseId || "",
         numeroCarrera: raceData?.num_carrera || raceData?.raceNumber || 0,
         fecha:
           raceData?.fecha ||
@@ -183,15 +252,21 @@ const BetAmount = ({
         selectedHorses: horsesArray,
         amount: amount || 0,
         potentialWin: potentialWin || 0,
+        // 🎯 Agregar dividendo y vales SOLO si aplica
+        ...(usaVales && {
+          dividendo: dividendo,
+          valesApostados: valesApostados,
+        }),
       };
 
-      console.log("📦 BetData RAW (antes de limpiar):", betDataRaw);
-      console.log("🐴 Caballos en betDataRaw:", betDataRaw.selectedHorses);
+      console.log("📦 BetData:", betDataRaw);
+      if (usaVales) {
+        console.log("💰 Sistema de VALES activado - Vales:", valesApostados);
+      } else {
+        console.log("💵 Apuesta DIRECTA - Monto:", amount);
+      }
 
       const betData = cleanBetData(betDataRaw);
-
-      console.log("📊 Datos de apuesta LIMPIOS a enviar:", betData);
-      console.log("🐴 Caballos DESPUÉS de limpiar:", betData.selectedHorses);
 
       const hasUndefined = Object.values(betData).some((v) => v === undefined);
       if (hasUndefined) {
@@ -201,11 +276,17 @@ const BetAmount = ({
         return;
       }
 
-      // Crear la apuesta
-      const result = await betService.createBet(user.uid, betData, userSaldo);
+      const result = await betService.createBet(
+        user.uid,
+        betData,
+        currentSaldo
+      );
 
       if (result.success) {
         setSuccess(true);
+        console.log(
+          "✅ Apuesta creada - El saldo se actualizará automáticamente"
+        );
         setTimeout(() => {
           onConfirm();
         }, 2000);
@@ -244,38 +325,31 @@ const BetAmount = ({
                 : "⚠️ No hay caballos seleccionados"}
             </span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-400">Cantidad de apuestas:</span>
-            <span className="text-white font-semibold">1</span>
-          </div>
+          {/* 🎯 Mostrar dividendo SOLO si usa sistema de vales */}
+          {usaVales && (
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-400">Dividendo de la carrera:</span>
+              <span className="text-amber-300 font-semibold">${dividendo}</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 🔥 Mostrar límites de apuesta desde Firestore */}
-      {/* <div className="bg-gradient-to-r from-amber-500/20 to-slate-800/40 border border-amber-500/30 rounded-xl p-3">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-amber-300 font-semibold">
-            💰 Límites de apuesta:
-          </span>
-          <span className="text-amber-200">
-            ${minAmount.toLocaleString()} - ${maxAmount.toLocaleString()}
-          </span>
-        </div>
-      </div> */}
-
-      {/* Saldo disponible */}
+      {/* Saldo disponible CON indicador de tiempo real */}
       <div className="bg-gradient-to-r from-fuchsia-500/20 to-slate-800/40 border border-fuchsia-500/30 rounded-xl p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/30">
               <Wallet className="w-5 h-5 text-fuchsia-400" />
             </div>
-            <span className="text-slate-300 font-semibold">
-              Saldo disponible:
-            </span>
+            <div className="flex flex-col">
+              <span className="text-slate-300 font-semibold">
+                Saldo disponible:
+              </span>
+            </div>
           </div>
           <span className="text-2xl font-bold text-fuchsia-300">
-            ${userSaldo?.toLocaleString() || 0}
+            ${currentSaldo?.toLocaleString() || 0}
           </span>
         </div>
       </div>
@@ -295,7 +369,7 @@ const BetAmount = ({
               value={amount || ""}
               onChange={(e) => handleAmountInput(e.target.value)}
               min={minAmount}
-              max={maxAmount}
+              max={Math.min(maxAmount, currentSaldo)}
               step="100"
               placeholder="0"
               disabled={loading}
@@ -304,9 +378,34 @@ const BetAmount = ({
           </div>
           <p className="text-slate-500 text-xs mt-2">
             Monto mínimo: ${minAmount.toLocaleString()} • Monto máximo: $
-            {maxAmount.toLocaleString()}
+            {Math.min(maxAmount, currentSaldo).toLocaleString()}
           </p>
         </label>
+
+        {/* 💰 Mostrar VALES equivalentes SOLO si usa sistema de vales */}
+        {usaVales && amount > 0 && (
+          <div className="bg-gradient-to-r from-amber-500/20 to-amber-600/20 border-2 border-amber-500/40 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Ticket className="w-5 h-5 text-amber-400" />
+                <span className="text-slate-300 font-semibold">
+                  Tu apuesta equivale a:
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-3xl font-bold text-amber-300">
+                  {valesApostados}
+                </span>
+                <span className="text-lg text-amber-400 font-semibold">
+                  VALES
+                </span>
+              </div>
+            </div>
+            <p className="text-amber-300/70 text-xs mt-2 text-center">
+              ${amount.toLocaleString()} ÷ ${dividendo} = {valesApostados} vales
+            </p>
+          </div>
+        )}
 
         {/* Montos rápidos */}
         {quickAmounts.length > 0 && (
@@ -333,7 +432,7 @@ const BetAmount = ({
         )}
       </div>
 
-      {/* Total y Ganancia Potencial */}
+      {/* Total a Apostar */}
       {amount > 0 && (
         <div className="space-y-3">
           <div className="bg-gradient-to-r from-fuchsia-500/20 to-fuchsia-600/20 border-2 border-fuchsia-500/40 rounded-xl p-4">
@@ -360,7 +459,17 @@ const BetAmount = ({
               <p className="text-green-300 font-bold text-lg">
                 ¡Apuesta registrada exitosamente! 🎉
               </p>
-              <p className="text-green-400/80 text-sm">Redirigiendo...</p>
+              {usaVales ? (
+                <p className="text-green-400/80 text-sm">
+                  Se descontaron {valesApostados} vales - Tu saldo se
+                  actualizará automáticamente
+                </p>
+              ) : (
+                <p className="text-green-400/80 text-sm">
+                  Se descontaron ${amount.toLocaleString()} - Tu saldo se
+                  actualizará automáticamente
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -384,9 +493,9 @@ const BetAmount = ({
         </button>
         <button
           onClick={handleConfirmBet}
-          disabled={!canProceed || loading || success}
+          disabled={!canProceed || loading || success || amount > currentSaldo}
           className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all ${
-            canProceed && !loading && !success
+            canProceed && !loading && !success && amount <= currentSaldo
               ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 hover:from-fuchsia-500 hover:to-fuchsia-400 text-white shadow-lg shadow-fuchsia-500/30"
               : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
           }`}>

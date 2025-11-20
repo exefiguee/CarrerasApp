@@ -12,6 +12,8 @@ import {
 import BetTypeSelector from "./BetTypeSelector";
 import HorseSelector from "./HorseSelector";
 import BetAmount from "./BetAmount";
+import { db } from "../firebase/config";
+import { doc, onSnapshot } from "firebase/firestore";
 
 const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
   const [step, setStep] = useState(1);
@@ -21,6 +23,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
   const [amount, setAmount] = useState(0);
   const [betTypes, setBetTypes] = useState({});
   const [loading, setLoading] = useState(true);
+  const [currentRaceData, setCurrentRaceData] = useState(race);
 
   // 🔥 Orden CORRECTO de tipos de apuesta (del más simple al más complejo)
   const BET_TYPE_ORDER = [
@@ -44,17 +47,69 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
     "PICK 6",
   ];
 
-  // 🔥 Cargar tipos de apuesta DIRECTAMENTE desde race.tiposApuestas de Firestore
+  // 🔥 Listener en tiempo real para la carrera seleccionada
   useEffect(() => {
-    if (!race || !race.tiposApuestas) {
+    if (!race || !race.firebaseId) {
+      console.warn("⚠️ No hay firebaseId en la carrera");
+      setCurrentRaceData(race);
+      return;
+    }
+
+    console.log(
+      "🔥 Iniciando listener en tiempo real para carrera:",
+      race.firebaseId
+    );
+
+    const carreraRef = doc(db, "carreras1", race.firebaseId);
+
+    const unsubscribe = onSnapshot(
+      carreraRef,
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const updatedRace = {
+            ...docSnapshot.data(),
+            firebaseId: docSnapshot.id,
+            horses: race.horses, // Mantener los caballos generados
+          };
+
+          console.log("🔄 Carrera actualizada en tiempo real:", updatedRace);
+          setCurrentRaceData(updatedRace);
+        } else {
+          console.warn("⚠️ La carrera ya no existe en Firestore");
+        }
+      },
+      (error) => {
+        console.error("❌ Error en listener de carrera:", error);
+      }
+    );
+
+    // Limpiar el listener cuando el modal se cierre
+    return () => {
+      console.log("🛑 Deteniendo listener de carrera");
+      unsubscribe();
+    };
+  }, [race?.firebaseId]);
+
+  // 🔥 Cargar tipos de apuesta desde los datos actualizados en tiempo real
+  useEffect(() => {
+    if (!currentRaceData || !currentRaceData.tiposApuestas) {
       console.warn("⚠️ No hay tiposApuestas en la carrera");
       setLoading(false);
       return;
     }
 
-    console.log("📊 Datos de la carrera desde Firestore:", race);
-    console.log("🎯 tiposApuestas desde Firestore:", race.tiposApuestas);
-    console.log("💰 limitesApuestas desde Firestore:", race.limitesApuestas);
+    console.log(
+      "📊 Datos de la carrera desde Firestore (tiempo real):",
+      currentRaceData
+    );
+    console.log(
+      "🎯 tiposApuestas desde Firestore:",
+      currentRaceData.tiposApuestas
+    );
+    console.log(
+      "💰 limitesApuestas desde Firestore:",
+      currentRaceData.limitesApuestas
+    );
 
     // Mapeo de configuración para cada tipo de apuesta
     const betTypeConfig = {
@@ -81,42 +136,44 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
     // 🔥 Filtrar SOLO los tipos de apuesta que están en TRUE en Firestore
     const enabledTypesTemp = {};
 
-    Object.entries(race.tiposApuestas).forEach(([key, isEnabled]) => {
-      console.log(`🔍 Verificando ${key}: ${isEnabled}`);
+    Object.entries(currentRaceData.tiposApuestas).forEach(
+      ([key, isEnabled]) => {
+        console.log(`🔍 Verificando ${key}: ${isEnabled}`);
 
-      // Si está en FALSE, NO lo incluimos
-      if (isEnabled !== true) {
-        console.log(`❌ ${key} está en FALSE - NO se mostrará`);
-        return;
+        // Si está en FALSE, NO lo incluimos
+        if (isEnabled !== true) {
+          console.log(`❌ ${key} está en FALSE - NO se mostrará`);
+          return;
+        }
+
+        // Si está en TRUE y existe configuración, lo agregamos
+        if (betTypeConfig[key]) {
+          const normalizedKey = key.replace(/[(),\s]/g, "_").toUpperCase();
+
+          // 🔥 Convertir la clave para buscar en limitesApuestas
+          // Ejemplo: "TRIFECTA D" -> "TRIFECTAD1"
+          const keyWithOne = key.replace(/\s/g, "") + "1";
+
+          // 🔥 Buscar límites desde limitesApuestas
+          const limites = currentRaceData.limitesApuestas?.[keyWithOne] || {
+            apuestaMinima: 200,
+            apuestaMaxima: 50000,
+          };
+
+          enabledTypesTemp[normalizedKey] = {
+            label: key,
+            originalKey: key,
+            ...betTypeConfig[key],
+            apuestaMinima: limites.apuestaMinima || 200,
+            apuestaMaxima: limites.apuestaMaxima || 50000,
+          };
+          console.log(
+            `✅ ${key} está en TRUE - se mostrará con límites:`,
+            limites
+          );
+        }
       }
-
-      // Si está en TRUE y existe configuración, lo agregamos
-      if (betTypeConfig[key]) {
-        const normalizedKey = key.replace(/[(),\s]/g, "_").toUpperCase();
-
-        // 🔥 Convertir la clave para buscar en limitesApuestas
-        // Ejemplo: "TRIFECTA D" -> "TRIFECTAD1"
-        const keyWithOne = key.replace(/\s/g, "") + "1";
-
-        // 🔥 Buscar límites desde limitesApuestas
-        const limites = race.limitesApuestas?.[keyWithOne] || {
-          apuestaMinima: 200,
-          apuestaMaxima: 50000,
-        };
-
-        enabledTypesTemp[normalizedKey] = {
-          label: key,
-          originalKey: key,
-          ...betTypeConfig[key],
-          apuestaMinima: limites.apuestaMinima || 200,
-          apuestaMaxima: limites.apuestaMaxima || 50000,
-        };
-        console.log(
-          `✅ ${key} está en TRUE - se mostrará con límites:`,
-          limites
-        );
-      }
-    });
+    );
 
     // 🔥 ORDENAR según BET_TYPE_ORDER
     const orderedBetTypes = {};
@@ -129,7 +186,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
     });
 
     console.log(
-      "🎯 Tipos de apuesta HABILITADOS Y ORDENADOS:",
+      "🎯 Tipos de apuesta HABILITADOS Y ORDENADOS (tiempo real):",
       orderedBetTypes
     );
     console.log(
@@ -147,7 +204,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
 
     setBetTypes(orderedBetTypes);
     setLoading(false);
-  }, [race]);
+  }, [currentRaceData]);
 
   const handleBetTypeSelect = (type) => {
     console.log("🎯 Tipo de apuesta seleccionado:", type);
@@ -219,15 +276,17 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
             <div className="flex items-center gap-2 text-sm text-slate-300">
               <span>🇦🇷</span>
               <span className="font-semibold">
-                {race.venue || race.descripcion_hipodromo}
+                {currentRaceData.venue || currentRaceData.descripcion_hipodromo}
               </span>
               <span className="text-slate-500">•</span>
               <span className="text-slate-400">
-                Carrera {race.raceNumber || race.num_carrera}
+                Carrera{" "}
+                {currentRaceData.raceNumber || currentRaceData.num_carrera}
               </span>
             </div>
             <div className="text-xs text-slate-400">
-              {race.date || race.fecha_texto} - {race.time || race.hora}
+              {currentRaceData.date || currentRaceData.fecha_texto} -{" "}
+              {currentRaceData.time || currentRaceData.hora}
             </div>
           </div>
         </div>
@@ -257,7 +316,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
 
               {step === 2 && (
                 <HorseSelector
-                  horses={race.horses}
+                  horses={currentRaceData.horses}
                   betType={betType}
                   betTypeConfig={betTypes[betType]}
                   selectedHorses={selectedHorses}
@@ -265,7 +324,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
                   onBack={() => setStep(1)}
                   onNext={handleHorsesSelected}
                   canProceed={canProceed()}
-                  race={race}
+                  race={currentRaceData}
                 />
               )}
 
@@ -279,7 +338,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
                   onBack={() => setStep(2)}
                   onConfirm={handleConfirmBet}
                   canProceed={canProceed()}
-                  raceData={race}
+                  raceData={currentRaceData}
                   user={user}
                   userSaldo={userSaldo}
                   maxBetAmount={betTypes[betType]?.apuestaMaxima}

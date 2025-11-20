@@ -11,6 +11,7 @@ import {
   Timestamp,
   doc,
   updateDoc,
+  onSnapshot, // 🔥 NUEVO: Para escuchar cambios en tiempo real
 } from "firebase/firestore";
 
 import {
@@ -303,7 +304,46 @@ const RacesList = ({ onSelectRace }) => {
   useEffect(() => {
     cargarDatos();
     cargarTransmisiones();
-    cargarCarrerasDesdeFirestore();
+  }, []);
+
+  // 🔥 NUEVO: Listener en tiempo real para carreras de Firestore
+  useEffect(() => {
+    console.log("🔥 Iniciando listener en tiempo real para carreras...");
+
+    const carrerasRef = collection(db, "carreras1");
+    const q = query(carrerasRef, orderBy("fecha", "asc"));
+
+    // onSnapshot escucha cambios en tiempo real
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const carreras = [];
+        snapshot.forEach((doc) => {
+          carreras.push({
+            firebaseId: doc.id,
+            ...doc.data(),
+          });
+        });
+
+        console.log(
+          `🔄 Actualización en tiempo real: ${carreras.length} carreras`
+        );
+        setCarrerasFromFirestore(carreras);
+        setUsandoFirestore(true);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("❌ Error en listener de carreras:", error);
+        setUsandoFirestore(false);
+        setLoading(false);
+      }
+    );
+
+    // Limpiar el listener cuando el componente se desmonte
+    return () => {
+      console.log("🛑 Deteniendo listener de carreras");
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -348,7 +388,6 @@ const RacesList = ({ onSelectRace }) => {
     }
   };
 
-  // Función para convertir fecha string a Timestamp
   const convertirFechaATimestamp = (fechaStr, horaStr) => {
     try {
       let day, month, year;
@@ -387,7 +426,6 @@ const RacesList = ({ onSelectRace }) => {
     }
   };
 
-  // Función para crear el mapa de caballitos
   const crearMapaCaballitos = (numCaballos) => {
     const caballitos = {};
     const totalCaballos = parseInt(numCaballos) || 0;
@@ -398,7 +436,7 @@ const RacesList = ({ onSelectRace }) => {
 
     return caballitos;
   };
-  // Crear tipos de apuestas por defecto
+
   const crearTiposApuestasDefault = () => {
     return {
       GANADOR: true,
@@ -444,13 +482,12 @@ const RacesList = ({ onSelectRace }) => {
       PICK61: { apuestaMinima: 200, apuestaMaxima: 200000 },
     };
   };
+
   const guardarCarrerasEnFirestore = async (jsonData) => {
     try {
       if (!jsonData || !jsonData.carreras) return;
 
       const carrerasRef = collection(db, "carreras1");
-
-      // Cargar carreras existentes
       const querySnapshot = await getDocs(carrerasRef);
       const carrerasExistentes = new Map();
 
@@ -473,13 +510,11 @@ const RacesList = ({ onSelectRace }) => {
       for (const carrera of jsonData.carreras) {
         const carreraExistente = carrerasExistentes.get(carrera.id);
 
-        // Si ya existe, saltar sin procesar
         if (carreraExistente) {
           sinCambios++;
           continue;
         }
 
-        // Solo procesar carreras nuevas
         const hipodromoInfo = jsonData.hipodromos.find(
           (h) => h.id === carrera.id_hipodromo
         );
@@ -497,13 +532,13 @@ const RacesList = ({ onSelectRace }) => {
           seJuega: true,
           tiposApuestas: crearTiposApuestasDefault(),
           limitesApuestas: crearLimitesApuestasDefault(),
+          dividendo: 100,
         };
 
         const limpio = Object.fromEntries(
           Object.entries(carreraData).filter(([k, v]) => v !== undefined)
         );
 
-        // ✨ Nueva carrera
         await addDoc(carrerasRef, {
           ...limpio,
           createdAt: Timestamp.now(),
@@ -521,35 +556,8 @@ const RacesList = ({ onSelectRace }) => {
    🔄 ${actualizadas} actualizadas
    ⏭️  ${sinCambios} sin cambios
       `);
-
-      // Solo recargar si hubo cambios
-      if (nuevas > 0) {
-        await cargarCarrerasDesdeFirestore();
-      }
     } catch (error) {
       console.error("❌ Error guardando carreras:", error);
-    }
-  };
-  const cargarCarrerasDesdeFirestore = async () => {
-    try {
-      const carrerasRef = collection(db, "carreras1");
-      const q = query(carrerasRef, orderBy("fecha", "asc"));
-      const querySnapshot = await getDocs(q);
-
-      const carreras = [];
-      querySnapshot.forEach((doc) => {
-        carreras.push({
-          firebaseId: doc.id,
-          ...doc.data(),
-        });
-      });
-
-      setCarrerasFromFirestore(carreras);
-      setUsandoFirestore(true);
-      console.log(`📊 ${carreras.length} carreras cargadas desde Firestore`);
-    } catch (error) {
-      console.error("Error cargando carreras desde Firestore:", error);
-      setUsandoFirestore(false);
     }
   };
 
@@ -566,7 +574,6 @@ const RacesList = ({ onSelectRace }) => {
 
       if (jsonData.error === 0) {
         setData(jsonData);
-        // Guardar carreras en Firestore
         await guardarCarrerasEnFirestore(jsonData);
       } else {
         setError("Error en los datos recibidos");
@@ -597,14 +604,12 @@ const RacesList = ({ onSelectRace }) => {
   const getCarrerasDelHipodromo = () => {
     if (!selectedHipodromo) return [];
 
-    // Si usamos Firestore, filtrar de ahí
     if (usandoFirestore && carrerasFromFirestore.length > 0) {
       return carrerasFromFirestore.filter(
         (c) => c.id_hipodromo === selectedHipodromo
       );
     }
 
-    // Si no, usar los datos de la API
     if (!data) return [];
     return data.carreras.filter((c) => c.id_hipodromo === selectedHipodromo);
   };
@@ -720,24 +725,6 @@ const RacesList = ({ onSelectRace }) => {
               <div className="p-4 md:p-6 flex-1 overflow-y-auto custom-scrollbar">
                 {activeTab === "hipodromos" && (
                   <div className="space-y-4">
-                    {/* Indicador de fuente de datos */}
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-slate-700/50">
-                      <span className="text-xs text-slate-400">
-                        Fuente de datos:
-                      </span>
-                      <span
-                        className={`text-xs font-bold ${
-                          usandoFirestore ? "text-green-400" : "text-amber-400"
-                        }`}>
-                        {usandoFirestore ? "🔥 Firestore" : "🌐 API Externa"}
-                      </span>
-                      {usandoFirestore && (
-                        <span className="text-xs text-slate-500">
-                          ({carrerasFromFirestore.length} carreras)
-                        </span>
-                      )}
-                    </div>
-
                     <div className="grid grid-cols-1 gap-3">
                       <select
                         value={selectedHipodromo || ""}
@@ -792,12 +779,6 @@ const RacesList = ({ onSelectRace }) => {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {data?.hipodromos
-                          .filter((hip) => hip.id === selectedHipodromo)
-                          .map((hip) => {
-                            const carrerasCount = carrerasDelHipodromo.length;
-                          })}
-
                         <div>
                           <h4 className="text-white font-semibold text-lg mb-3 flex items-center gap-2">
                             <Calendar className="w-5 h-5 text-fuchsia-400" />
