@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   ChevronLeft,
@@ -12,6 +12,8 @@ import {
 import BetTypeSelector from "./BetTypeSelector";
 import HorseSelector from "./HorseSelector";
 import BetAmount from "./BetAmount";
+import { db } from "../firebase/config";
+import { doc, onSnapshot } from "firebase/firestore";
 
 const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
   const [step, setStep] = useState(1);
@@ -19,30 +21,210 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
   const [selectedHorses, setSelectedHorses] = useState([]);
   const [selectedRace, setSelectedRace] = useState([]);
   const [amount, setAmount] = useState(0);
+  const [betTypes, setBetTypes] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [currentRaceData, setCurrentRaceData] = useState(race);
 
-  const betTypes = {
-    GANADOR: { label: "GANADOR", maxHorses: 1, minHorses: 1 },
-    SEGUNDO: { label: "SEGUNDO", maxHorses: 1, minHorses: 1 },
-    TERCERO: { label: "TERCERO", maxHorses: 1, minHorses: 1 },
-    EXACTA: { label: "EXACTA", maxHorses: 2, minHorses: 2 },
-    TRIFECTA_D: { label: "TRIFECTA D", maxHorses: 1, minHorses: 1 },
-    TIRA_1_2: { label: "TIRA(1,2)", maxHorses: 2, minHorses: 2 },
-    TIRA_1_2_3: { label: "TIRA(1,2,3)", maxHorses: 3, minHorses: 3 },
-    TRIFECTA_C: { label: "TRIFECTA C", maxHorses: 3, minHorses: 3 },
-  };
+  // 🔥 Orden CORRECTO de tipos de apuesta (del más simple al más complejo)
+  const BET_TYPE_ORDER = [
+    "GANADOR",
+    "SEGUNDO",
+    "TERCERO",
+    "EXACTA",
+    "IMPERFECTA",
+    "TIRA(1,2)",
+    "TIRA(1,2,3)",
+    "TRIFECTA D",
+    "TRIFECTA C",
+    "CUATRIFECTA D",
+    "CUATRIFECTA C",
+    "QUINTEX D",
+    "QUINTEX C",
+    "DOBLE",
+    "TRIPLO",
+    "PICK 4",
+    "PICK 5",
+    "PICK 6",
+  ];
+
+  // 🔥 Listener en tiempo real para la carrera seleccionada
+  useEffect(() => {
+    if (!race || !race.firebaseId) {
+      console.warn("⚠️ No hay firebaseId en la carrera");
+      setCurrentRaceData(race);
+      return;
+    }
+
+    console.log(
+      "🔥 Iniciando listener en tiempo real para carrera:",
+      race.firebaseId
+    );
+
+    const carreraRef = doc(db, "carreras1", race.firebaseId);
+
+    const unsubscribe = onSnapshot(
+      carreraRef,
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const updatedRace = {
+            ...docSnapshot.data(),
+            firebaseId: docSnapshot.id,
+            horses: race.horses, // Mantener los caballos generados
+          };
+
+          console.log("🔄 Carrera actualizada en tiempo real:", updatedRace);
+          setCurrentRaceData(updatedRace);
+        } else {
+          console.warn("⚠️ La carrera ya no existe en Firestore");
+        }
+      },
+      (error) => {
+        console.error("❌ Error en listener de carrera:", error);
+      }
+    );
+
+    // Limpiar el listener cuando el modal se cierre
+    return () => {
+      console.log("🛑 Deteniendo listener de carrera");
+      unsubscribe();
+    };
+  }, [race?.firebaseId]);
+
+  // 🔥 Cargar tipos de apuesta desde los datos actualizados en tiempo real
+  useEffect(() => {
+    if (!currentRaceData || !currentRaceData.tiposApuestas) {
+      console.warn("⚠️ No hay tiposApuestas en la carrera");
+      setLoading(false);
+      return;
+    }
+
+    console.log(
+      "📊 Datos de la carrera desde Firestore (tiempo real):",
+      currentRaceData
+    );
+    console.log(
+      "🎯 tiposApuestas desde Firestore:",
+      currentRaceData.tiposApuestas
+    );
+    console.log(
+      "💰 limitesApuestas desde Firestore:",
+      currentRaceData.limitesApuestas
+    );
+
+    // Mapeo de configuración para cada tipo de apuesta
+    const betTypeConfig = {
+      GANADOR: { maxHorses: 1, minHorses: 1 },
+      SEGUNDO: { maxHorses: 1, minHorses: 1 },
+      TERCERO: { maxHorses: 1, minHorses: 1 },
+      "TIRA(1,2)": { maxHorses: 2, minHorses: 2 },
+      "TIRA(1,2,3)": { maxHorses: 3, minHorses: 3 },
+      EXACTA: { maxHorses: 2, minHorses: 2 },
+      IMPERFECTA: { maxHorses: 2, minHorses: 2 },
+      "TRIFECTA D": { maxHorses: 3, minHorses: 3 },
+      "CUATRIFECTA D": { maxHorses: 4, minHorses: 4 },
+      "QUINTEX D": { maxHorses: 5, minHorses: 5 },
+      "TRIFECTA C": { maxHorses: 3, minHorses: 3 },
+      "CUATRIFECTA C": { maxHorses: 4, minHorses: 4 },
+      "QUINTEX C": { maxHorses: 5, minHorses: 5 },
+      DOBLE: { maxHorses: 1, minHorses: 1 },
+      TRIPLO: { maxHorses: 1, minHorses: 1 },
+      "PICK 4": { maxHorses: 1, minHorses: 1 },
+      "PICK 5": { maxHorses: 1, minHorses: 1 },
+      "PICK 6": { maxHorses: 1, minHorses: 1 },
+    };
+
+    // 🔥 Filtrar SOLO los tipos de apuesta que están en TRUE en Firestore
+    const enabledTypesTemp = {};
+
+    Object.entries(currentRaceData.tiposApuestas).forEach(
+      ([key, isEnabled]) => {
+        console.log(`🔍 Verificando ${key}: ${isEnabled}`);
+
+        // Si está en FALSE, NO lo incluimos
+        if (isEnabled !== true) {
+          console.log(`❌ ${key} está en FALSE - NO se mostrará`);
+          return;
+        }
+
+        // Si está en TRUE y existe configuración, lo agregamos
+        if (betTypeConfig[key]) {
+          const normalizedKey = key.replace(/[(),\s]/g, "_").toUpperCase();
+
+          // 🔥 Convertir la clave para buscar en limitesApuestas
+          // Ejemplo: "TRIFECTA D" -> "TRIFECTAD1"
+          const keyWithOne = key.replace(/\s/g, "") + "1";
+
+          // 🔥 Buscar límites desde limitesApuestas
+          const limites = currentRaceData.limitesApuestas?.[keyWithOne] || {
+            apuestaMinima: 200,
+            apuestaMaxima: 50000,
+          };
+
+          enabledTypesTemp[normalizedKey] = {
+            label: key,
+            originalKey: key,
+            ...betTypeConfig[key],
+            apuestaMinima: limites.apuestaMinima || 200,
+            apuestaMaxima: limites.apuestaMaxima || 50000,
+          };
+          console.log(
+            `✅ ${key} está en TRUE - se mostrará con límites:`,
+            limites
+          );
+        }
+      }
+    );
+
+    // 🔥 ORDENAR según BET_TYPE_ORDER
+    const orderedBetTypes = {};
+
+    BET_TYPE_ORDER.forEach((originalKey) => {
+      const normalizedKey = originalKey.replace(/[(),\s]/g, "_").toUpperCase();
+      if (enabledTypesTemp[normalizedKey]) {
+        orderedBetTypes[normalizedKey] = enabledTypesTemp[normalizedKey];
+      }
+    });
+
+    console.log(
+      "🎯 Tipos de apuesta HABILITADOS Y ORDENADOS (tiempo real):",
+      orderedBetTypes
+    );
+    console.log(
+      "📊 Total de tipos habilitados:",
+      Object.keys(orderedBetTypes).length
+    );
+    console.log(
+      "📋 Orden de tipos con límites:",
+      Object.keys(orderedBetTypes).map((key) => ({
+        tipo: orderedBetTypes[key].label,
+        min: orderedBetTypes[key].apuestaMinima,
+        max: orderedBetTypes[key].apuestaMaxima,
+      }))
+    );
+
+    setBetTypes(orderedBetTypes);
+    setLoading(false);
+  }, [currentRaceData]);
 
   const handleBetTypeSelect = (type) => {
+    console.log("🎯 Tipo de apuesta seleccionado:", type);
     setBetType(type);
     setSelectedHorses([]);
     setStep(2);
   };
 
   const handleHorsesSelected = (horses) => {
+    console.log("🐴 Caballos seleccionados en modal:", horses);
     setSelectedHorses(horses);
     setStep(3);
   };
 
   const handleConfirmBet = () => {
+    console.log("✅ Confirmando apuesta con:", {
+      betType,
+      selectedHorses,
+      amount,
+    });
     onClose();
   };
 
@@ -55,7 +237,12 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
       );
     }
     if (step === 3) {
-      return amount >= 200 && amount <= 50000 && amount <= (userSaldo || 0);
+      const config = betTypes[betType];
+      const minAmount = config?.apuestaMinima || 200;
+      const maxAmount = config?.apuestaMaxima || 50000;
+      return (
+        amount >= minAmount && amount <= maxAmount && amount <= (userSaldo || 0)
+      );
     }
     return true;
   };
@@ -64,7 +251,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800/50 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-600/20 via-emerald-500/20 to-slate-800/40 border-b border-slate-800/50 p-5">
+        <div className="bg-gradient-to-r from-fuchsia-600/20 via-fuchsia-500/20 to-slate-800/40 border-b border-slate-800/50 p-5">
           <div className="flex justify-between items-start mb-3">
             <div className="flex-1">
               <h2 className="text-xl font-bold text-white mb-1">
@@ -73,7 +260,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
                 {step === 3 && `Confirma tu ${betTypes[betType]?.label}`}
               </h2>
               <div className="flex items-center gap-2 text-sm">
-                <span className="px-2 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded text-emerald-300 font-semibold">
+                <span className="px-2 py-1 bg-fuchsia-500/20 border border-fuchsia-500/30 rounded text-fuchsia-300 font-semibold">
                   Paso {step}/3
                 </span>
               </div>
@@ -89,55 +276,76 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
             <div className="flex items-center gap-2 text-sm text-slate-300">
               <span>🇦🇷</span>
               <span className="font-semibold">
-                {race.venue || race.descripcion_hipodromo}
+                {currentRaceData.venue || currentRaceData.descripcion_hipodromo}
               </span>
               <span className="text-slate-500">•</span>
               <span className="text-slate-400">
-                Carrera {race.raceNumber || race.num_carrera}
+                Carrera{" "}
+                {currentRaceData.raceNumber || currentRaceData.num_carrera}
               </span>
             </div>
             <div className="text-xs text-slate-400">
-              {race.date || race.fecha} - {race.time || race.hora}
+              {currentRaceData.date || currentRaceData.fecha_texto} -{" "}
+              {currentRaceData.time || currentRaceData.hora}
             </div>
           </div>
         </div>
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-220px)] custom-scrollbar">
-          {step === 1 && (
-            <BetTypeSelector
-              betTypes={betTypes}
-              onSelect={handleBetTypeSelect}
-            />
-          )}
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="w-12 h-12 border-4 border-fuchsia-500/30 border-t-fuchsia-500 rounded-full animate-spin mb-4"></div>
+              <p className="text-slate-400">Cargando tipos de apuesta...</p>
+            </div>
+          ) : Object.keys(betTypes).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Trophy className="w-16 h-16 text-slate-600 mb-4" />
+              <p className="text-slate-400 text-center">
+                No hay tipos de apuesta habilitados para esta carrera
+              </p>
+            </div>
+          ) : (
+            <>
+              {step === 1 && (
+                <BetTypeSelector
+                  betTypes={betTypes}
+                  onSelect={handleBetTypeSelect}
+                />
+              )}
 
-          {step === 2 && (
-            <HorseSelector
-              horses={race.horses}
-              betType={betType}
-              betTypeConfig={betTypes[betType]}
-              selectedHorses={selectedHorses}
-              onSelect={setSelectedHorses}
-              onBack={() => setStep(1)}
-              onNext={handleHorsesSelected}
-              canProceed={canProceed()}
-            />
-          )}
+              {step === 2 && (
+                <HorseSelector
+                  horses={currentRaceData.horses}
+                  betType={betType}
+                  betTypeConfig={betTypes[betType]}
+                  selectedHorses={selectedHorses}
+                  onSelect={setSelectedHorses}
+                  onBack={() => setStep(1)}
+                  onNext={handleHorsesSelected}
+                  canProceed={canProceed()}
+                  race={currentRaceData}
+                />
+              )}
 
-          {step === 3 && (
-            <BetAmount
-              selectedRace={selectedRace}
-              betType={betType}
-              selectedHorses={selectedHorses}
-              amount={amount}
-              onAmountChange={setAmount}
-              onBack={() => setStep(2)}
-              onConfirm={handleConfirmBet}
-              canProceed={canProceed()}
-              raceData={race}
-              user={user}
-              userSaldo={userSaldo}
-            />
+              {step === 3 && (
+                <BetAmount
+                  selectedRace={selectedRace}
+                  betType={betType}
+                  selectedHorses={selectedHorses}
+                  amount={amount}
+                  onAmountChange={setAmount}
+                  onBack={() => setStep(2)}
+                  onConfirm={handleConfirmBet}
+                  canProceed={canProceed()}
+                  raceData={currentRaceData}
+                  user={user}
+                  userSaldo={userSaldo}
+                  maxBetAmount={betTypes[betType]?.apuestaMaxima}
+                  minBetAmount={betTypes[betType]?.apuestaMinima}
+                />
+              )}
+            </>
           )}
         </div>
 
@@ -161,11 +369,11 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(16, 185, 129, 0.3);
+          background: rgba(217, 70, 239, 0.3);
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(16, 185, 129, 0.5);
+          background: rgba(217, 70, 239, 0.5);
         }
         @keyframes in {
           from {
