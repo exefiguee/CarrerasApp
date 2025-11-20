@@ -6,6 +6,7 @@ import RacesList from "./components/RacesList";
 import BetModal from "./components/BetModal";
 import { Menu, X, Calendar, LogOut, User, Wallet, Plus } from "lucide-react";
 import "./App.css";
+import logoCaballo from '../dist/logocaballo.png';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -162,11 +163,11 @@ function App() {
             {/* Logo */}
             <div className="flex items-center gap-3">
               <div className="w-16 h-16 md:w-20 md:h-20">
-                <img
-                  src="../public/logocaballo.png"
-                  alt="TURF424.BET"
-                  className="w-full h-full object-contain rounded-2xl"
-                />
+                      <img
+              src={logoCaballo}
+              alt="TURF424.BET"
+              className="w-full h-full object-contain rounded-2xl"
+            />
               </div>
 
               <div>
