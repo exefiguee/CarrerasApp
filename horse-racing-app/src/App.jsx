@@ -61,7 +61,7 @@ function App() {
 
   const cargarDatos = async () => {
     try {
-      setLoading(true);
+      setLoading(true);   
       const response = await fetch(
         "https://xwdc.net/nuevo/ext_datos_carrerasv2.php"
       );
