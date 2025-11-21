@@ -446,6 +446,7 @@ const RacesList = ({ onSelectRace }) => {
       "TIRA(1,2,3)": true,
       EXACTA: true,
       IMPERFECTA: true,
+      "IMPERFECTA C": true,
       "TRIFECTA D": true,
       "CUATRIFECTA D": true,
       "QUINTEX D": true,
@@ -462,104 +463,167 @@ const RacesList = ({ onSelectRace }) => {
 
   const crearLimitesApuestasDefault = () => {
     return {
-      GANADOR1: { apuestaMinima: 200, apuestaMaxima: 30000 },
-      SEGUNDO1: { apuestaMinima: 200, apuestaMaxima: 15000 },
-      TERCERO1: { apuestaMinima: 200, apuestaMaxima: 10000 },
-      "TIRA(1,2)1": { apuestaMinima: 200, apuestaMaxima: 50000 },
-      "TIRA(1,2,3)1": { apuestaMinima: 200, apuestaMaxima: 75000 },
-      EXACTA1: { apuestaMinima: 200, apuestaMaxima: 75000 },
-      IMPERFECTA1: { apuestaMinima: 200, apuestaMaxima: 50000 },
+      //dsadsadsa
+      GANADOR1: {
+        apuestaMinima: 200,
+        apuestaMaxima: 30000,
+        topededinero: 100000,
+      },
+      SEGUNDO1: {
+        apuestaMinima: 200,
+        apuestaMaxima: 15000,
+        topededinero: 100000,
+      },
+      TERCERO1: {
+        apuestaMinima: 200,
+        apuestaMaxima: 10000,
+        topededinero: 100000,
+      },
+      //dsadsa
+      "TIRA(1,2)1": {
+        apuestaMinima: 200,
+        apuestaMaxima: 50000,
+        topedeapuesta: 60,
+      },
+      "TIRA(1,2,3)1": {
+        apuestaMinima: 200,
+        apuestaMaxima: 75000,
+        topedeapuesta: 60,
+      },
+      EXACTA1: {
+        apuestaMinima: 200,
+        apuestaMaxima: 75000,
+        topedeconbinaciones: 60,
+      },
+      IMPERFECTA1: {
+        apuestaMinima: 200,
+        apuestaMaxima: 50000,
+        topedeconbinaciones: 60,
+      },
+      IMPERFECTAC1: {
+        apuestaMinima: 200,
+        apuestaMaxima: 50000,
+        topedeconbinaciones: 60,
+      },
       TRIFECTAD1: { apuestaMinima: 200, apuestaMaxima: 100000 },
-      CUATRIFECTAD1: { apuestaMinima: 200, apuestaMaxima: 150000 },
+      CUATRIFECTAD1: {
+        apuestaMinima: 200,
+        apuestaMaxima: 150000,
+        topedeconbinaciones: 150,
+      },
       QUINTEXD1: { apuestaMinima: 200, apuestaMaxima: 200000 },
-      TRIFECTAC1: { apuestaMinima: 200, apuestaMaxima: 100000 },
-      CUATRIFECTAC1: { apuestaMinima: 200, apuestaMaxima: 150000 },
+      TRIFECTAC1: {
+        apuestaMinima: 200,
+        apuestaMaxima: 100000,
+        topedeconbinaciones: 100,
+      },
+      CUATRIFECTAC1: {
+        apuestaMinima: 200,
+        apuestaMaxima: 150000,
+        topedeconbinaciones: 150,
+      },
       QUINTEXC1: { apuestaMinima: 200, apuestaMaxima: 200000 },
-      DOBLE1: { apuestaMinima: 200, apuestaMaxima: 50000 },
-      TRIPLO1: { apuestaMinima: 200, apuestaMaxima: 75000 },
-      PICK41: { apuestaMinima: 200, apuestaMaxima: 100000 },
-      PICK51: { apuestaMinima: 200, apuestaMaxima: 150000 },
+      DOBLE1: {
+        apuestaMinima: 200,
+        apuestaMaxima: 50000,
+        topedeconbinaciones: 60,
+      },
+      TRIPLO1: {
+        apuestaMinima: 200,
+        apuestaMaxima: 75000,
+        topedeconbinaciones: 100,
+      },
+      PICK41: {
+        apuestaMinima: 200,
+        apuestaMaxima: 100000,
+        topedeconbinaciones: 150,
+      },
+      PICK51: {
+        apuestaMinima: 200,
+        apuestaMaxima: 150000,
+        topedeconbinaciones: 150,
+      },
       PICK61: { apuestaMinima: 200, apuestaMaxima: 200000 },
     };
   };
 
-//   const guardarCarrerasEnFirestore = async (jsonData) => {
-//     try {
-//       if (!jsonData || !jsonData.carreras) return;
+  const guardarCarrerasEnFirestore = async (jsonData) => {
+    try {
+      if (!jsonData || !jsonData.carreras) return;
 
-//       const carrerasRef = collection(db, "carreras1");
-//       const querySnapshot = await getDocs(carrerasRef);
-//       const carrerasExistentes = new Map();
+      const carrerasRef = collection(db, "carreras1");
+      const querySnapshot = await getDocs(carrerasRef);
+      const carrerasExistentes = new Map();
 
-//       querySnapshot.forEach((doc) => {
-//         const data = doc.data();
-//         carrerasExistentes.set(data.id_carrera, {
-//           firebaseId: doc.id,
-//           ...data,
-//         });
-//       });
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        carrerasExistentes.set(data.id_carrera, {
+          firebaseId: doc.id,
+          ...data,
+        });
+      });
 
-//       console.log(
-//         `📊 ${carrerasExistentes.size} carreras existentes en Firestore`
-//       );
+      console.log(
+        `📊 ${carrerasExistentes.size} carreras existentes en Firestore`
+      );
 
-//       let nuevas = 0;
-//       let actualizadas = 0;
-//       let sinCambios = 0;
+      let nuevas = 0;
+      let actualizadas = 0;
+      let sinCambios = 0;
 
-//       for (const carrera of jsonData.carreras) {
-//         const carreraExistente = carrerasExistentes.get(carrera.id);
+      for (const carrera of jsonData.carreras) {
+        const carreraExistente = carrerasExistentes.get(carrera.id);
 
-//         if (carreraExistente) {
-//           sinCambios++;
-//           continue;
-//         }
+        if (carreraExistente) {
+          sinCambios++;
+          continue;
+        }
 
-//         const hipodromoInfo = jsonData.hipodromos.find(
-//           (h) => h.id === carrera.id_hipodromo
-//         );
+        const hipodromoInfo = jsonData.hipodromos.find(
+          (h) => h.id === carrera.id_hipodromo
+        );
 
-//         const carreraData = {
-//           id_carrera: carrera.id,
-//           num_carrera: carrera.num_carrera,
-//           id_hipodromo: carrera.id_hipodromo,
-//           descripcion_hipodromo: hipodromoInfo?.descripcion || "Desconocido",
-//           fecha: convertirFechaATimestamp(carrera.fecha, carrera.hora),
-//           fecha_texto: carrera.fecha,
-//           hora: carrera.hora,
-//           caballos: parseInt(carrera.caballos) || 0,
-//           caballitos: crearMapaCaballitos(carrera.caballos),
-//           seJuega: true,
-//           tiposApuestas: crearTiposApuestasDefault(),
-//           limitesApuestas: crearLimitesApuestasDefault(),
-//           dividendo: 100,
-//         };
+        const carreraData = {
+          id_carrera: carrera.id,
+          num_carrera: carrera.num_carrera,
+          id_hipodromo: carrera.id_hipodromo,
+          descripcion_hipodromo: hipodromoInfo?.descripcion || "Desconocido",
+          fecha: convertirFechaATimestamp(carrera.fecha, carrera.hora),
+          fecha_texto: carrera.fecha,
+          hora: carrera.hora,
+          caballos: parseInt(carrera.caballos) || 0,
+          caballitos: crearMapaCaballitos(carrera.caballos),
+          seJuega: true,
+          tiposApuestas: crearTiposApuestasDefault(),
+          limitesApuestas: crearLimitesApuestasDefault(),
+          dividendo: 100,
+        };
 
-//         const limpio = Object.fromEntries(
-//           Object.entries(carreraData).filter(([k, v]) => v !== undefined)
-//         );
+        const limpio = Object.fromEntries(
+          Object.entries(carreraData).filter(([k, v]) => v !== undefined)
+        );
 
-//         await addDoc(carrerasRef, {
-//           ...limpio,
-//           createdAt: Timestamp.now(),
-//           updatedAt: Timestamp.now(),
-//         });
-//         nuevas++;
-//         console.log(
-//           `✨ Nueva carrera ${carrera.num_carrera} agregada con tipos de apuestas`
-//         );
-//       }
+        await addDoc(carrerasRef, {
+          ...limpio,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+        nuevas++;
+        console.log(
+          `✨ Nueva carrera ${carrera.num_carrera} agregada con tipos de apuestas`
+        );
+      }
 
-//       console.log(`
-// ✅ Sincronización completada:
-//    ✨ ${nuevas} nuevas
-//    🔄 ${actualizadas} actualizadas
-//    ⏭️  ${sinCambios} sin cambios
-//       `);
-//     } catch (error) {
-//       console.error("❌ Error guardando carreras:", error);
-//     }
-//   };
+      console.log(`
+✅ Sincronización completada:
+   ✨ ${nuevas} nuevas
+   🔄 ${actualizadas} actualizadas
+   ⏭️  ${sinCambios} sin cambios
+      `);
+    } catch (error) {
+      console.error("❌ Error guardando carreras:", error);
+    }
+  };
 
   const cargarDatos = async () => {
     try {
@@ -574,7 +638,7 @@ const RacesList = ({ onSelectRace }) => {
 
       if (jsonData.error === 0) {
         setData(jsonData);
-        // await guardarCarrerasEnFirestore(jsonData);
+        await guardarCarrerasEnFirestore(jsonData);
       } else {
         setError("Error en los datos recibidos");
       }

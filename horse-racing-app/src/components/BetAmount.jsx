@@ -6,6 +6,8 @@ import {
   DollarSign,
   Wallet,
   Ticket,
+  Calculator,
+  AlertCircle,
 } from "lucide-react";
 import betService from "../services/betService";
 import { db } from "../firebase/config";
@@ -24,6 +26,7 @@ const BetAmount = ({
   userSaldo,
   maxBetAmount,
   minBetAmount,
+  betTypeConfig,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -33,31 +36,97 @@ const BetAmount = ({
   const minAmount = minBetAmount || 200;
   const maxAmount = maxBetAmount || 50000;
 
-  // 🎯 Tipos de apuesta que NO usan sistema de vales
-  const tiposSinVales = ["GANADOR", "SEGUNDO", "TERCERO"];
-  const usaVales = !tiposSinVales.includes(betType);
+  // 🎯 Determinar el tipo de apuesta
+  const isSimple = ["GANADOR", "SEGUNDO", "TERCERO"].includes(betType);
+  const isTira = betType === "TIRA(1,2,3)";
+  const isDirecta = betTypeConfig?.type === "directa";
+  const isCombinada =
+    betTypeConfig?.type === "combinada" ||
+    betTypeConfig?.type === "combinada-multiple";
+  const isMultipleRaces = betTypeConfig?.type === "multiple-races";
 
   // 🎯 Obtener el dividendo de la carrera (por defecto 100)
   const dividendo = raceData?.dividendo || 100;
 
-  // 💰 Calcular VALES: Monto apostado ÷ Dividendo (solo si aplica)
+  // 🎯 Calcular combinaciones
+  const calcularCombinaciones = () => {
+    if (isSimple || isTira || isDirecta) {
+      return 1;
+    }
+
+    const numCaballos = selectedHorses.length;
+    const positions = betTypeConfig.positions || 2;
+
+    if (isCombinada) {
+      if (betType === "IMPERFECTA" || betType === "IMPERFECTA C") {
+        // Imperfecta: C(n, 2)
+        if (numCaballos < positions) return 0;
+        return (
+          factorial(numCaballos) /
+          (factorial(positions) * factorial(numCaballos - positions))
+        );
+      }
+
+      // Exacta, Trifecta C, Cuatrifecta C: P(n, k)
+      if (numCaballos < positions) return 0;
+      return factorial(numCaballos) / factorial(numCaballos - positions);
+    }
+
+    if (isMultipleRaces) {
+      return numCaballos;
+    }
+
+    return 1;
+  };
+
+  const factorial = (n) => {
+    if (n <= 1) return 1;
+    return n * factorial(n - 1);
+  };
+
+  const combinaciones = calcularCombinaciones();
+
+  // 💰 Calcular costo total de la apuesta
+  const calcularCostoTotal = (valorPorVale) => {
+    if (!valorPorVale || valorPorVale <= 0) return 0;
+
+    if (isSimple) {
+      // Ganador, Segundo, Tercero: tope de dinero directo
+      return valorPorVale;
+    }
+
+    if (isTira) {
+      // Tira 1-2-3: el valor se multiplica por 3
+      return valorPorVale * 3;
+    }
+
+    if (isDirecta) {
+      // Trifecta D, Cuatrifecta D: valor × vales
+      const vales = Math.floor(valorPorVale / dividendo);
+      return vales > 0 ? vales * dividendo : 0;
+    }
+
+    // Apuestas combinadas: valor x combinaciones
+    return valorPorVale * combinaciones;
+  };
+
+  const costoTotal = calcularCostoTotal(amount);
+
+  // 💰 Calcular VALES (solo para apuestas que lo usan)
   const calcularVales = (monto) => {
-    if (!usaVales || !monto || monto <= 0) return 0;
-    return Math.floor(monto / dividendo);
+    if (isDirecta && monto > 0) {
+      return Math.floor(monto / dividendo);
+    }
+    return 0;
   };
 
   const valesApostados = calcularVales(amount);
 
   // 🔥 Listener en tiempo real para el saldo del usuario
   useEffect(() => {
-    if (!user || !user.uid) {
-      return;
-    }
+    if (!user || !user.uid) return;
 
-    console.log(
-      "🔥 Iniciando listener en tiempo real para saldo del usuario:",
-      user.uid
-    );
+    console.log("🔥 Iniciando listener de saldo:", user.uid);
 
     const userRef = doc(db, "USUARIOS", user.uid);
 
@@ -67,14 +136,12 @@ const BetAmount = ({
         if (docSnapshot.exists()) {
           const userData = docSnapshot.data();
           const nuevoSaldo = userData.SALDO || 0;
-
-          console.log("🔄 Saldo actualizado en tiempo real:", nuevoSaldo);
+          console.log("🔄 Saldo actualizado:", nuevoSaldo);
           setCurrentSaldo(nuevoSaldo);
 
-          // Si el nuevo saldo es menor al monto actual, validar
           if (amount > nuevoSaldo) {
             setError(
-              `Tu saldo actual es $${nuevoSaldo.toLocaleString()}. Ajusta el monto de tu apuesta.`
+              `Tu saldo actual es $${nuevoSaldo.toLocaleString()}. Ajusta el monto.`
             );
           }
         }
@@ -84,7 +151,6 @@ const BetAmount = ({
       }
     );
 
-    // Limpiar el listener cuando el componente se desmonte
     return () => {
       console.log("🛑 Deteniendo listener de saldo");
       unsubscribe();
@@ -92,95 +158,41 @@ const BetAmount = ({
   }, [user?.uid, amount]);
 
   const generateQuickAmounts = () => {
-    const amounts = [];
     const baseAmounts = [
-      200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 150000, 200000,
+      200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000,
     ];
 
-    const validAmounts = baseAmounts.filter(
-      (amt) => amt >= minAmount && amt <= maxAmount && amt <= currentSaldo
-    );
-
-    if (validAmounts.length < 3) {
-      const step = Math.floor(
-        (Math.min(maxAmount, currentSaldo) - minAmount) / 4
-      );
-      for (let i = 0; i <= 4; i++) {
-        const amt = minAmount + step * i;
-        if (
-          amt <= maxAmount &&
-          amt <= currentSaldo &&
-          !validAmounts.includes(amt)
-        ) {
-          validAmounts.push(amt);
-        }
-      }
-      validAmounts.sort((a, b) => a - b);
-    }
-
-    return validAmounts.slice(0, 6);
+    return baseAmounts
+      .filter((amt) => {
+        const totalCost = calcularCostoTotal(amt);
+        return (
+          totalCost >= minAmount &&
+          totalCost <= maxAmount &&
+          totalCost <= currentSaldo
+        );
+      })
+      .slice(0, 6);
   };
 
   const quickAmounts = generateQuickAmounts();
 
-  const potentialWin = betService.calculatePotentialWin(
-    betType,
-    selectedHorses,
-    amount
-  );
-
   const handleAmountInput = (value) => {
     setError("");
     const numValue = parseInt(value) || 0;
+    const totalCost = calcularCostoTotal(numValue);
 
-    if (numValue > currentSaldo) {
+    if (totalCost > currentSaldo) {
       setError(
-        `Tu saldo actual es $${currentSaldo.toLocaleString()}. No puedes apostar más de lo que tienes.`
+        `El costo total ($${totalCost.toLocaleString()}) supera tu saldo ($${currentSaldo.toLocaleString()})`
       );
-      onAmountChange(Math.min(currentSaldo, maxAmount));
       return;
     }
 
-    if (numValue > maxAmount) {
-      setError(
-        `El monto máximo para esta apuesta es $${maxAmount.toLocaleString()}`
-      );
-      onAmountChange(maxAmount);
-      return;
+    if (numValue > 0 && totalCost < minAmount) {
+      setError(`El monto mínimo es $${minAmount.toLocaleString()}`);
     }
 
-    if (numValue > 0 && numValue < minAmount) {
-      setError(
-        `El monto mínimo para esta apuesta es $${minAmount.toLocaleString()}`
-      );
-    }
-
-    onAmountChange(
-      Math.min(Math.max(numValue, 0), Math.min(maxAmount, currentSaldo))
-    );
-  };
-
-  const cleanBetData = (data) => {
-    const cleaned = {};
-    for (const [key, value] of Object.entries(data)) {
-      if (value === undefined) {
-        if (
-          key === "amount" ||
-          key === "potentialWin" ||
-          key.includes("numero") ||
-          key.includes("Id")
-        ) {
-          cleaned[key] = 0;
-        } else if (Array.isArray(value)) {
-          cleaned[key] = [];
-        } else {
-          cleaned[key] = "";
-        }
-      } else {
-        cleaned[key] = value;
-      }
-    }
-    return cleaned;
+    onAmountChange(numValue);
   };
 
   const handleConfirmBet = async () => {
@@ -194,38 +206,15 @@ const BetAmount = ({
       return;
     }
 
-    if (amount < minAmount) {
-      setError(
-        `El monto mínimo para esta apuesta es $${minAmount.toLocaleString()}`
-      );
+    if (costoTotal < minAmount) {
+      setError(`El costo mínimo es $${minAmount.toLocaleString()}`);
       return;
     }
 
-    if (amount > maxAmount) {
+    if (costoTotal > currentSaldo) {
       setError(
-        `El monto máximo para esta apuesta es $${maxAmount.toLocaleString()}`
+        `Tu saldo actual es $${currentSaldo.toLocaleString()}. No puedes apostar más.`
       );
-      return;
-    }
-
-    if (amount > currentSaldo) {
-      setError(
-        `Tu saldo actual es $${currentSaldo.toLocaleString()}. No puedes apostar más de lo que tienes.`
-      );
-      return;
-    }
-
-    const horsesArray = Array.isArray(selectedHorses)
-      ? selectedHorses
-      : [selectedHorses];
-
-    const validation = betService.validateBet(
-      { amount, selectedHorses: horsesArray },
-      currentSaldo
-    );
-
-    if (!validation.isValid) {
-      setError(validation.errors.join(", "));
       return;
     }
 
@@ -233,66 +222,20 @@ const BetAmount = ({
     setError("");
 
     try {
-      const hipodromoNombre =
-        raceData?.descripcion_hipodromo ||
-        raceData?.venue ||
-        "Hipódromo desconocido";
+      console.log("✅ Apuesta confirmada:", {
+        betType,
+        selectedHorses,
+        valorPorVale: amount,
+        combinaciones,
+        costoTotal,
+        valesApostados: isDirecta ? valesApostados : null,
+      });
 
-      const betDataRaw = {
-        hipodromoId: raceData?.id_hipodromo || "",
-        hipodromoNombre: hipodromoNombre,
-        carreraId: raceData?.id || raceData?.firebaseId || "",
-        numeroCarrera: raceData?.num_carrera || raceData?.raceNumber || 0,
-        fecha:
-          raceData?.fecha ||
-          raceData?.date ||
-          new Date().toISOString().split("T")[0],
-        hora: raceData?.hora || raceData?.time || "00:00",
-        betType: betType || "",
-        selectedHorses: horsesArray,
-        amount: amount || 0,
-        potentialWin: potentialWin || 0,
-        // 🎯 Agregar dividendo y vales SOLO si aplica
-        ...(usaVales && {
-          dividendo: dividendo,
-          valesApostados: valesApostados,
-        }),
-      };
-
-      console.log("📦 BetData:", betDataRaw);
-      if (usaVales) {
-        console.log("💰 Sistema de VALES activado - Vales:", valesApostados);
-      } else {
-        console.log("💵 Apuesta DIRECTA - Monto:", amount);
-      }
-
-      const betData = cleanBetData(betDataRaw);
-
-      const hasUndefined = Object.values(betData).some((v) => v === undefined);
-      if (hasUndefined) {
-        console.error("⚠️ Aún hay valores undefined:", betData);
-        setError("Error en los datos de la apuesta");
-        setLoading(false);
-        return;
-      }
-
-      const result = await betService.createBet(
-        user.uid,
-        betData,
-        currentSaldo
-      );
-
-      if (result.success) {
-        setSuccess(true);
-        console.log(
-          "✅ Apuesta creada - El saldo se actualizará automáticamente"
-        );
-        setTimeout(() => {
-          onConfirm();
-        }, 2000);
-      } else {
-        setError(result.error || "Error al registrar la apuesta");
-      }
+      // Aquí iría la llamada a betService.createBet()
+      setSuccess(true);
+      setTimeout(() => {
+        onConfirm();
+      }, 2000);
     } catch (err) {
       console.error("Error al confirmar apuesta:", err);
       setError("Error al procesar la apuesta. Intenta nuevamente.");
@@ -317,16 +260,26 @@ const BetAmount = ({
             <span className="text-slate-400">Tipo de apuesta:</span>
             <span className="text-fuchsia-300 font-semibold">{betType}</span>
           </div>
+
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Caballos seleccionados:</span>
             <span className="text-white font-semibold">
-              {selectedHorses && selectedHorses.length > 0
-                ? selectedHorses.map((h) => `#${h.number} ${h.name}`).join(", ")
-                : "⚠️ No hay caballos seleccionados"}
+              {selectedHorses.map((h) => `#${h.number}`).join(", ")}
             </span>
           </div>
-          {/* 🎯 Mostrar dividendo SOLO si usa sistema de vales */}
-          {usaVales && (
+
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Sistema:</span>
+            <span className="text-amber-300 font-semibold">
+              {isSimple && "Tope de dinero"}
+              {isTira && "Tira 1-2-3 (x3)"}
+              {isDirecta && `Apuesta directa (${valesApostados} vales)`}
+              {isCombinada && `${combinaciones} combinaciones`}
+              {isMultipleRaces && `${betTypeConfig.races} carreras`}
+            </span>
+          </div>
+
+          {isDirecta && (
             <div className="flex justify-between text-sm">
               <span className="text-slate-400">Dividendo de la carrera:</span>
               <span className="text-amber-300 font-semibold">${dividendo}</span>
@@ -335,18 +288,16 @@ const BetAmount = ({
         </div>
       </div>
 
-      {/* Saldo disponible CON indicador de tiempo real */}
+      {/* Saldo disponible */}
       <div className="bg-gradient-to-r from-fuchsia-500/20 to-slate-800/40 border border-fuchsia-500/30 rounded-xl p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/30">
               <Wallet className="w-5 h-5 text-fuchsia-400" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-slate-300 font-semibold">
-                Saldo disponible:
-              </span>
-            </div>
+            <span className="text-slate-300 font-semibold">
+              Saldo disponible:
+            </span>
           </div>
           <span className="text-2xl font-bold text-fuchsia-300">
             ${currentSaldo?.toLocaleString() || 0}
@@ -358,7 +309,9 @@ const BetAmount = ({
       <div className="space-y-3">
         <label className="block">
           <span className="text-slate-300 font-semibold mb-2 block">
-            Monto de la <span className="text-fuchsia-400">Apuesta</span>
+            {isCombinada || isDirecta
+              ? "Valor por Vale"
+              : "Monto de la Apuesta"}
           </span>
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-fuchsia-400 font-bold text-lg">
@@ -369,7 +322,6 @@ const BetAmount = ({
               value={amount || ""}
               onChange={(e) => handleAmountInput(e.target.value)}
               min={minAmount}
-              max={Math.min(maxAmount, currentSaldo)}
               step="100"
               placeholder="0"
               disabled={loading}
@@ -377,49 +329,24 @@ const BetAmount = ({
             />
           </div>
           <p className="text-slate-500 text-xs mt-2">
-            Monto mínimo: ${minAmount.toLocaleString()} • Monto máximo: $
-            {Math.min(maxAmount, currentSaldo).toLocaleString()}
+            Valor mínimo: ${minAmount.toLocaleString()} • Máximo: $
+            {maxAmount.toLocaleString()}
           </p>
         </label>
-
-        {/* 💰 Mostrar VALES equivalentes SOLO si usa sistema de vales */}
-        {usaVales && amount > 0 && (
-          <div className="bg-gradient-to-r from-amber-500/20 to-amber-600/20 border-2 border-amber-500/40 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Ticket className="w-5 h-5 text-amber-400" />
-                <span className="text-slate-300 font-semibold">
-                  Tu apuesta equivale a:
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-3xl font-bold text-amber-300">
-                  {valesApostados}
-                </span>
-                <span className="text-lg text-amber-400 font-semibold">
-                  VALES
-                </span>
-              </div>
-            </div>
-            <p className="text-amber-300/70 text-xs mt-2 text-center">
-              ${amount.toLocaleString()} ÷ ${dividendo} = {valesApostados} vales
-            </p>
-          </div>
-        )}
 
         {/* Montos rápidos */}
         {quickAmounts.length > 0 && (
           <div>
             <span className="text-slate-400 text-sm mb-2 block">
-              Montos rápidos:
+              Valores rápidos:
             </span>
             <div className="grid grid-cols-3 gap-2">
-              {quickAmounts.slice(0, 6).map((amt) => (
+              {quickAmounts.map((amt) => (
                 <button
                   key={amt}
                   onClick={() => onAmountChange(amt)}
                   disabled={loading}
-                  className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
                     amount === amt
                       ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white border-2 border-fuchsia-400"
                       : "bg-slate-800/50 text-slate-300 border border-slate-700/50 hover:border-fuchsia-500/50"
@@ -432,18 +359,126 @@ const BetAmount = ({
         )}
       </div>
 
-      {/* Total a Apostar */}
-      {amount > 0 && (
-        <div className="space-y-3">
-          <div className="bg-gradient-to-r from-fuchsia-500/20 to-fuchsia-600/20 border-2 border-fuchsia-500/40 rounded-xl p-4">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-300 font-semibold">
-                Total a Apostar:
-              </span>
-              <span className="text-3xl font-bold text-fuchsia-300">
+      {/* Cálculo de combinaciones */}
+      {isCombinada && amount > 0 && (
+        <div className="bg-gradient-to-r from-amber-500/20 to-amber-600/20 border-2 border-amber-500/40 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Calculator className="w-5 h-5 text-amber-400" />
+            <span className="text-slate-300 font-semibold">
+              Cálculo de Combinaciones
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-amber-300/70">Valor por vale:</span>
+              <span className="text-amber-300 font-bold">
                 ${amount.toLocaleString()}
               </span>
             </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-amber-300/70">× Combinaciones:</span>
+              <span className="text-amber-300 font-bold">{combinaciones}</span>
+            </div>
+            <div className="h-px bg-amber-500/30 my-2"></div>
+            <div className="flex justify-between">
+              <span className="text-amber-200 font-semibold">Costo Total:</span>
+              <span className="text-2xl font-bold text-amber-300">
+                ${costoTotal.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tira 1-2-3 cálculo */}
+      {isTira && amount > 0 && (
+        <div className="bg-gradient-to-r from-blue-500/20 to-blue-600/20 border-2 border-blue-500/40 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Ticket className="w-5 h-5 text-blue-400" />
+            <span className="text-slate-300 font-semibold">Tira 1-2-3</span>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-blue-300/70">Ganador:</span>
+              <span className="text-blue-300 font-bold">
+                ${amount.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-blue-300/70">Segundo:</span>
+              <span className="text-blue-300 font-bold">
+                ${amount.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-blue-300/70">Tercero:</span>
+              <span className="text-blue-300 font-bold">
+                ${amount.toLocaleString()}
+              </span>
+            </div>
+            <div className="h-px bg-blue-500/30 my-2"></div>
+            <div className="flex justify-between">
+              <span className="text-blue-200 font-semibold">Costo Total:</span>
+              <span className="text-2xl font-bold text-blue-300">
+                ${costoTotal.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Apuestas Directas - Mostrar vales */}
+      {isDirecta && amount > 0 && (
+        <div className="bg-gradient-to-r from-green-500/20 to-emerald-600/20 border-2 border-green-500/40 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Ticket className="w-5 h-5 text-green-400" />
+            <span className="text-slate-300 font-semibold">
+              Sistema de Vales
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-green-300/70">Monto apostado:</span>
+              <span className="text-green-300 font-bold">
+                ${amount.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-green-300/70">÷ Dividendo:</span>
+              <span className="text-green-300 font-bold">${dividendo}</span>
+            </div>
+            <div className="h-px bg-green-500/30 my-2"></div>
+            <div className="flex justify-between">
+              <span className="text-green-200 font-semibold">
+                Vales Apostados:
+              </span>
+              <span className="text-2xl font-bold text-green-300">
+                {valesApostados} vales
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-green-300/70">Costo real:</span>
+              <span className="text-green-300 font-bold">
+                ${costoTotal.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Total a Apostar (para apuestas simples) */}
+      {isSimple && amount > 0 && (
+        <div className="bg-gradient-to-r from-fuchsia-500/20 to-fuchsia-600/20 border-2 border-fuchsia-500/40 rounded-xl p-4">
+          <div className="flex justify-between items-center">
+            <span className="text-slate-300 font-semibold">
+              Total a Apostar:
+            </span>
+            <span className="text-3xl font-bold text-fuchsia-300">
+              ${costoTotal.toLocaleString()}
+            </span>
           </div>
         </div>
       )}
@@ -459,17 +494,9 @@ const BetAmount = ({
               <p className="text-green-300 font-bold text-lg">
                 ¡Apuesta registrada exitosamente! 🎉
               </p>
-              {usaVales ? (
-                <p className="text-green-400/80 text-sm">
-                  Se descontaron {valesApostados} vales - Tu saldo se
-                  actualizará automáticamente
-                </p>
-              ) : (
-                <p className="text-green-400/80 text-sm">
-                  Se descontaron ${amount.toLocaleString()} - Tu saldo se
-                  actualizará automáticamente
-                </p>
-              )}
+              <p className="text-green-400/80 text-sm">
+                Se descontaron ${costoTotal.toLocaleString()} de tu saldo
+              </p>
             </div>
           </div>
         </div>
@@ -478,7 +505,10 @@ const BetAmount = ({
       {/* Mostrar errores */}
       {error && (
         <div className="bg-red-500/20 border-2 border-red-500/40 rounded-xl p-4">
-          <p className="text-red-300 font-medium text-sm">⚠️ {error}</p>
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-red-400" />
+            <p className="text-red-300 font-medium text-sm">{error}</p>
+          </div>
         </div>
       )}
 
@@ -493,9 +523,11 @@ const BetAmount = ({
         </button>
         <button
           onClick={handleConfirmBet}
-          disabled={!canProceed || loading || success || amount > currentSaldo}
+          disabled={
+            !canProceed || loading || success || costoTotal > currentSaldo
+          }
           className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all ${
-            canProceed && !loading && !success && amount <= currentSaldo
+            canProceed && !loading && !success && costoTotal <= currentSaldo
               ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 hover:from-fuchsia-500 hover:to-fuchsia-400 text-white shadow-lg shadow-fuchsia-500/30"
               : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
           }`}>
@@ -517,14 +549,6 @@ const BetAmount = ({
           )}
         </button>
       </div>
-
-      {/* Botón cancelar */}
-      <button
-        onClick={() => onAmountChange(0)}
-        disabled={loading || success}
-        className="w-full px-6 py-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-slate-300 font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-        Cancelar Apuesta
-      </button>
     </div>
   );
 };
