@@ -295,7 +295,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
       return (
         selectedHorses.length >= config.minHorses &&
         selectedHorses.length <= config.maxHorses
-      );
+      );  
     }
     if (step === 3) {
       const config = betTypes[betType];
