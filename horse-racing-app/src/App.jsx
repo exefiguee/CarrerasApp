@@ -6,7 +6,7 @@ import RacesList from "./components/RacesList";
 import BetModal from "./components/BetModal";
 import { Menu, X, Calendar, LogOut, User, Wallet, Plus } from "lucide-react";
 import "./App.css";
-import logoCaballo from '../dist/logocaballo.png';
+   import logoCaballo from "./assets/logocaballo.png";
 
 function App() {
   const [user, setUser] = useState(null);

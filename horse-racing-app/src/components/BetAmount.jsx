@@ -1,17 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  Trophy,
-  ChevronLeft,
-  Check,
-  DollarSign,
-  Wallet,
-  Ticket,
-  Calculator,
-  AlertCircle,
-} from "lucide-react";
-import betService from "../services/betService";
-import { db } from "../firebase/config";
-import { doc, onSnapshot } from "firebase/firestore";
+import { ChevronLeft, DollarSign, AlertCircle, TrendingUp, Check } from "lucide-react";
 
 const BetAmount = ({
   betType,
@@ -28,52 +16,65 @@ const BetAmount = ({
   minBetAmount,
   betTypeConfig,
 }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-  const [currentSaldo, setCurrentSaldo] = useState(userSaldo);
+  const [customAmount, setCustomAmount] = useState("");
 
-  const minAmount = minBetAmount || 200;
-  const maxAmount = maxBetAmount || 50000;
+  console.log("💰 BetAmount - Config:", {
+    betType,
+    selectedHorses: selectedHorses.length,
+    minBetAmount,
+    maxBetAmount,
+    userSaldo,
+  });
 
-  // 🎯 Determinar el tipo de apuesta
-  const isSimple = ["GANADOR", "SEGUNDO", "TERCERO"].includes(betType);
-  const isTira = betType === "TIRA(1,2,3)";
-  const isDirecta = betTypeConfig?.type === "directa";
-  const isCombinada =
-    betTypeConfig?.type === "combinada" ||
-    betTypeConfig?.type === "combinada-multiple";
-  const isMultipleRaces = betTypeConfig?.type === "multiple-races";
+  // 🎯 Calcular combinaciones (mismo cálculo que en HorseSelector)
+  const calculateCombinations = () => {
+    const selectionMode = betTypeConfig?.selectionMode;
 
-  // 🎯 Obtener el dividendo de la carrera (por defecto 100)
-  const dividendo = raceData?.dividendo || 100;
 
-  // 🎯 Calcular combinaciones
-  const calcularCombinaciones = () => {
-    if (isSimple || isTira || isDirecta) {
+     if (selectionMode === "grouped-positions" && selectedHorses.position1 && selectedHorses.position2) {
+      const group1 = selectedHorses.position1.length || 0;
+      const group2 = selectedHorses.position2.length || 0;
+      return group1 * group2;
+    }
+
+   const n = Array.isArray(selectedHorses) ? selectedHorses.length : 0;
+
+
+    if (n === 0) return 0;
+
+    // Simple (1 caballo = 1 apuesta)
+    // Incluye: GANADOR, SEGUNDO, TERCERO, EXACTA, IMPERFECTA
+    if (selectionMode === "single") {
       return 1;
     }
 
-    const numCaballos = selectedHorses.length;
-    const positions = betTypeConfig.positions || 2;
-
-    if (isCombinada) {
-      if (betType === "IMPERFECTA" || betType === "IMPERFECTA C") {
-        // Imperfecta: C(n, 2)
-        if (numCaballos < positions) return 0;
-        return (
-          factorial(numCaballos) /
-          (factorial(positions) * factorial(numCaballos - positions))
-        );
-      }
-
-      // Exacta, Trifecta C, Cuatrifecta C: P(n, k)
-      if (numCaballos < positions) return 0;
-      return factorial(numCaballos) / factorial(numCaballos - positions);
+    // TIRA (1 caballo = 3 apuestas)
+    if (betTypeConfig.type === "tira") {
+      return 3;
     }
 
-    if (isMultipleRaces) {
-      return numCaballos;
+    // TRIFECTA D, CUATRIFECTA D (Directa - 1 sola apuesta)
+    if (selectionMode === "ordered-direct") {
+      return 1;
+    }
+   
+  
+
+    // TRIFECTA C (3 posiciones): P(n,3)
+    if (selectionMode === "ordered-combination" && betTypeConfig.positions === 3) {
+      if (n < 3) return 0;
+      return factorial(n) / factorial(n - 3);
+    }
+
+    // CUATRIFECTA C (4 posiciones): P(n,4)
+    if (selectionMode === "ordered-combination" && betTypeConfig.positions === 4) {
+      if (n < 4) return 0;
+      return factorial(n) / factorial(n - 4);
+    }
+
+    // Múltiples carreras: DOBLE, TRIPLO, PICK 4, PICK 5
+    if (selectionMode === "multi-race") {
+      return Math.pow(n, betTypeConfig.races || 1);
     }
 
     return 1;
@@ -81,434 +82,226 @@ const BetAmount = ({
 
   const factorial = (n) => {
     if (n <= 1) return 1;
-    return n * factorial(n - 1);
+    let result = 1;
+    for (let i = 2; i <= n; i++) {
+      result *= i;
+    }
+    return result;
   };
 
-  const combinaciones = calcularCombinaciones();
+  const combinaciones = calculateCombinations();
 
-  // 💰 Calcular costo total de la apuesta
-  const calcularCostoTotal = (valorPorVale) => {
-    if (!valorPorVale || valorPorVale <= 0) return 0;
-
-    if (isSimple) {
-      // Ganador, Segundo, Tercero: tope de dinero directo
-      return valorPorVale;
-    }
-
-    if (isTira) {
-      // Tira 1-2-3: el valor se multiplica por 3
-      return valorPorVale * 3;
-    }
-
-    if (isDirecta) {
-      // Trifecta D, Cuatrifecta D: valor × vales
-      const vales = Math.floor(valorPorVale / dividendo);
-      return vales > 0 ? vales * dividendo : 0;
-    }
-
-    // Apuestas combinadas: valor x combinaciones
-    return valorPorVale * combinaciones;
+  // 🎯 Calcular el monto total de la apuesta
+  const calculateTotalAmount = (baseAmount) => {
+    if (!baseAmount || baseAmount <= 0) return 0;
+    
+    const multiplier = betTypeConfig.multiplier || 1;
+    return baseAmount * combinaciones * multiplier;
   };
 
-  const costoTotal = calcularCostoTotal(amount);
+  const totalAmount = calculateTotalAmount(amount);
 
-  // 💰 Calcular VALES (solo para apuestas que lo usan)
-  const calcularVales = (monto) => {
-    if (isDirecta && monto > 0) {
-      return Math.floor(monto / dividendo);
-    }
-    return 0;
+  // 🎯 Validaciones
+  const isAmountValid = () => {
+    if (amount < minBetAmount) return false;
+    if (amount > maxBetAmount) return false;
+    if (totalAmount > userSaldo) return false;
+    return true;
   };
 
-  const valesApostados = calcularVales(amount);
-
-  // 🔥 Listener en tiempo real para el saldo del usuario
-  useEffect(() => {
-    if (!user || !user.uid) return;
-
-    console.log("🔥 Iniciando listener de saldo:", user.uid);
-
-    const userRef = doc(db, "USUARIOS", user.uid);
-
-    const unsubscribe = onSnapshot(
-      userRef,
-      (docSnapshot) => {
-        if (docSnapshot.exists()) {
-          const userData = docSnapshot.data();
-          const nuevoSaldo = userData.SALDO || 0;
-          console.log("🔄 Saldo actualizado:", nuevoSaldo);
-          setCurrentSaldo(nuevoSaldo);
-
-          if (amount > nuevoSaldo) {
-            setError(
-              `Tu saldo actual es $${nuevoSaldo.toLocaleString()}. Ajusta el monto.`
-            );
-          }
-        }
-      },
-      (error) => {
-        console.error("❌ Error en listener de saldo:", error);
-      }
-    );
-
-    return () => {
-      console.log("🛑 Deteniendo listener de saldo");
-      unsubscribe();
-    };
-  }, [user?.uid, amount]);
-
-  const generateQuickAmounts = () => {
-    const baseAmounts = [
-      200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000,
-    ];
-
-    return baseAmounts
-      .filter((amt) => {
-        const totalCost = calcularCostoTotal(amt);
-        return (
-          totalCost >= minAmount &&
-          totalCost <= maxAmount &&
-          totalCost <= currentSaldo
-        );
-      })
-      .slice(0, 6);
+  const getValidationMessage = () => {
+    if (amount < minBetAmount) {
+      return `La apuesta mínima es $${minBetAmount.toLocaleString("es-AR")}`;
+    }
+    if (amount > maxBetAmount) {
+      return `La apuesta máxima es $${maxBetAmount.toLocaleString("es-AR")}`;
+    }
+    if (totalAmount > userSaldo) {
+      return `No tenés saldo suficiente. Total necesario: $${totalAmount.toLocaleString("es-AR")}`;
+    }
+    return "";
   };
 
-  const quickAmounts = generateQuickAmounts();
+  // 🎯 Montos sugeridos
+  const suggestedAmounts = [
+    minBetAmount,
+    minBetAmount * 2,
+    minBetAmount * 5,
+    minBetAmount * 10,
+  ].filter((amt) => {
+    const total = calculateTotalAmount(amt);
+    return amt <= maxBetAmount && total <= userSaldo;
+  });
 
-  const handleAmountInput = (value) => {
-    setError("");
-    const numValue = parseInt(value) || 0;
-    const totalCost = calcularCostoTotal(numValue);
+  const handleSuggestedAmount = (suggestedAmount) => {
+    setCustomAmount("");
+    onAmountChange(suggestedAmount);
+  };
 
-    if (totalCost > currentSaldo) {
-      setError(
-        `El costo total ($${totalCost.toLocaleString()}) supera tu saldo ($${currentSaldo.toLocaleString()})`
-      );
-      return;
-    }
-
-    if (numValue > 0 && totalCost < minAmount) {
-      setError(`El monto mínimo es $${minAmount.toLocaleString()}`);
-    }
-
+  const handleCustomAmount = (value) => {
+    setCustomAmount(value);
+    const numValue = parseFloat(value) || 0;
     onAmountChange(numValue);
   };
 
-  const handleConfirmBet = async () => {
-    if (!user) {
-      setError("Debes iniciar sesión para apostar");
-      return;
-    }
-
-    if (!selectedHorses || selectedHorses.length === 0) {
-      setError("⚠️ Debes seleccionar al menos un caballo");
-      return;
-    }
-
-    if (costoTotal < minAmount) {
-      setError(`El costo mínimo es $${minAmount.toLocaleString()}`);
-      return;
-    }
-
-    if (costoTotal > currentSaldo) {
-      setError(
-        `Tu saldo actual es $${currentSaldo.toLocaleString()}. No puedes apostar más.`
-      );
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      console.log("✅ Apuesta confirmada:", {
+  const handleConfirm = () => {
+    if (isAmountValid()) {
+      console.log("✅ Confirmando apuesta:", {
         betType,
         selectedHorses,
-        valorPorVale: amount,
+        baseAmount: amount,
         combinaciones,
-        costoTotal,
-        valesApostados: isDirecta ? valesApostados : null,
+        totalAmount,
       });
-
-      // Aquí iría la llamada a betService.createBet()
-      setSuccess(true);
-      setTimeout(() => {
-        onConfirm();
-      }, 2000);
-    } catch (err) {
-      console.error("Error al confirmar apuesta:", err);
-      setError("Error al procesar la apuesta. Intenta nuevamente.");
-    } finally {
-      setLoading(false);
+      onConfirm();
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Resumen de apuesta */}
-      <div className="bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="p-2 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/30">
-            <Trophy className="w-5 h-5 text-fuchsia-400" />
-          </div>
-          <h3 className="font-bold text-white">Resumen de Apuesta</h3>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
+    <div className="space-y-4">
+      {/* Resumen de la apuesta */}
+      <div className="bg-gradient-to-r from-slate-800/60 to-slate-900/60 border border-slate-700/50 rounded-xl p-4">
+        <h3 className="text-fuchsia-300 font-semibold mb-3 flex items-center gap-2">
+          <Check className="w-5 h-5" />
+          Resumen de tu apuesta
+        </h3>
+        
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between items-center">
             <span className="text-slate-400">Tipo de apuesta:</span>
-            <span className="text-fuchsia-300 font-semibold">{betType}</span>
+            <span className="text-white font-semibold">{betTypeConfig?.label || betType}</span>
           </div>
-
-          <div className="flex justify-between text-sm">
+          
+          <div className="flex justify-between items-center">
             <span className="text-slate-400">Caballos seleccionados:</span>
             <span className="text-white font-semibold">
-              {selectedHorses.map((h) => `#${h.number}`).join(", ")}
+              {selectedHorses.map((h) => h.number).join(", ")}
             </span>
           </div>
 
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-400">Sistema:</span>
-            <span className="text-amber-300 font-semibold">
-              {isSimple && "Tope de dinero"}
-              {isTira && "Tira 1-2-3 (x3)"}
-              {isDirecta && `Apuesta directa (${valesApostados} vales)`}
-              {isCombinada && `${combinaciones} combinaciones`}
-              {isMultipleRaces && `${betTypeConfig.races} carreras`}
-            </span>
-          </div>
-
-          {isDirecta && (
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Dividendo de la carrera:</span>
-              <span className="text-amber-300 font-semibold">${dividendo}</span>
+          {betTypeConfig.type === "tira" && (
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400">Se jugará a:</span>
+              <span className="text-amber-300 font-semibold text-xs">
+                Ganador + Segundo + Tercero
+              </span>
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Saldo disponible */}
-      <div className="bg-gradient-to-r from-fuchsia-500/20 to-slate-800/40 border border-fuchsia-500/30 rounded-xl p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/30">
-              <Wallet className="w-5 h-5 text-fuchsia-400" />
-            </div>
-            <span className="text-slate-300 font-semibold">
-              Saldo disponible:
+          <div className="flex justify-between items-center pt-2 border-t border-slate-700/50">
+            <span className="text-slate-400">
+              {combinaciones === 1 ? "Apuesta única:" : "Combinaciones:"}
             </span>
+            <span className="text-amber-300 font-bold text-lg">{combinaciones}</span>
           </div>
-          <span className="text-2xl font-bold text-fuchsia-300">
-            ${currentSaldo?.toLocaleString() || 0}
-          </span>
         </div>
       </div>
 
-      {/* Input de monto */}
-      <div className="space-y-3">
-        <label className="block">
-          <span className="text-slate-300 font-semibold mb-2 block">
-            {isCombinada || isDirecta
-              ? "Valor por Vale"
-              : "Monto de la Apuesta"}
-          </span>
+      {/* Selector de monto */}
+      <div className="bg-gradient-to-r from-fuchsia-500/20 to-slate-800/40 border border-fuchsia-500/30 rounded-xl p-4">
+        <h3 className="text-fuchsia-300 font-semibold mb-3 flex items-center gap-2">
+          <DollarSign className="w-5 h-5" />
+          Monto por combinación
+        </h3>
+
+        {/* Montos sugeridos */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {suggestedAmounts.map((suggestedAmount) => (
+            <button
+              key={suggestedAmount}
+              onClick={() => handleSuggestedAmount(suggestedAmount)}
+              className={`px-4 py-3 rounded-xl font-semibold transition-all ${
+                amount === suggestedAmount && !customAmount
+                  ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white shadow-lg shadow-fuchsia-500/20"
+                  : "bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-slate-300"
+              }`}>
+              ${suggestedAmount.toLocaleString("es-AR")}
+            </button>
+          ))}
+        </div>
+
+        {/* Monto personalizado */}
+        <div className="space-y-2">
+          <label className="text-slate-400 text-sm">Monto personalizado:</label>
           <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-fuchsia-400 font-bold text-lg">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold">
               $
             </span>
             <input
               type="number"
-              value={amount || ""}
-              onChange={(e) => handleAmountInput(e.target.value)}
-              min={minAmount}
-              step="100"
-              placeholder="0"
-              disabled={loading}
-              className="w-full pl-10 pr-4 py-4 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-xl font-bold focus:outline-none focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              value={customAmount}
+              onChange={(e) => handleCustomAmount(e.target.value)}
+              placeholder={`Mínimo ${minBetAmount}`}
+              min={minBetAmount}
+              max={maxBetAmount}
+              className="w-full pl-8 pr-4 py-3 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white font-semibold focus:border-fuchsia-500/50 focus:outline-none transition-colors"
             />
           </div>
-          <p className="text-slate-500 text-xs mt-2">
-            Valor mínimo: ${minAmount.toLocaleString()} • Máximo: $
-            {maxAmount.toLocaleString()}
+          <p className="text-slate-500 text-xs">
+            Rango permitido: ${minBetAmount.toLocaleString("es-AR")} - ${maxBetAmount.toLocaleString("es-AR")}
           </p>
-        </label>
+        </div>
+      </div>
 
-        {/* Montos rápidos */}
-        {quickAmounts.length > 0 && (
-          <div>
-            <span className="text-slate-400 text-sm mb-2 block">
-              Valores rápidos:
+      {/* Cálculo del total */}
+      <div className="bg-gradient-to-br from-amber-500/20 to-slate-800/40 border-2 border-amber-500/40 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-amber-300 font-semibold flex items-center gap-2">
+            <TrendingUp className="w-5 h-5" />
+            Total a pagar
+          </span>
+          <span className="text-2xl font-bold text-white">
+            ${totalAmount.toLocaleString("es-AR")}
+          </span>
+        </div>
+
+        {combinaciones > 1 && amount > 0 && (
+          <div className="text-xs text-slate-400 space-y-1">
+            <p>
+              💡 ${amount.toLocaleString("es-AR")} por combinación × {combinaciones} combinaciones
+            </p>
+            {betTypeConfig.multiplier && betTypeConfig.multiplier > 1 && (
+              <p>
+                × {betTypeConfig.multiplier} (multiplicador de {betTypeConfig.label})
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="mt-3 pt-3 border-t border-amber-500/20 flex items-center justify-between">
+          <span className="text-slate-400 text-sm">Tu saldo disponible:</span>
+          <span className={`font-bold ${
+            totalAmount > userSaldo ? "text-red-400" : "text-emerald-400"
+          }`}>
+            ${userSaldo.toLocaleString("es-AR")}
+          </span>
+        </div>
+
+        {totalAmount > 0 && totalAmount <= userSaldo && (
+          <div className="mt-2 pt-2 border-t border-amber-500/20 flex items-center justify-between">
+            <span className="text-slate-400 text-sm">Saldo después:</span>
+            <span className="font-bold text-white">
+              ${(userSaldo - totalAmount).toLocaleString("es-AR")}
             </span>
-            <div className="grid grid-cols-3 gap-2">
-              {quickAmounts.map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => onAmountChange(amt)}
-                  disabled={loading}
-                  className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
-                    amount === amt
-                      ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white border-2 border-fuchsia-400"
-                      : "bg-slate-800/50 text-slate-300 border border-slate-700/50 hover:border-fuchsia-500/50"
-                  }`}>
-                  ${amt.toLocaleString()}
-                </button>
-              ))}
-            </div>
           </div>
         )}
       </div>
 
-      {/* Cálculo de combinaciones */}
-      {isCombinada && amount > 0 && (
-        <div className="bg-gradient-to-r from-amber-500/20 to-amber-600/20 border-2 border-amber-500/40 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Calculator className="w-5 h-5 text-amber-400" />
-            <span className="text-slate-300 font-semibold">
-              Cálculo de Combinaciones
-            </span>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-amber-300/70">Valor por vale:</span>
-              <span className="text-amber-300 font-bold">
-                ${amount.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-amber-300/70">× Combinaciones:</span>
-              <span className="text-amber-300 font-bold">{combinaciones}</span>
-            </div>
-            <div className="h-px bg-amber-500/30 my-2"></div>
-            <div className="flex justify-between">
-              <span className="text-amber-200 font-semibold">Costo Total:</span>
-              <span className="text-2xl font-bold text-amber-300">
-                ${costoTotal.toLocaleString()}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tira 1-2-3 cálculo */}
-      {isTira && amount > 0 && (
-        <div className="bg-gradient-to-r from-blue-500/20 to-blue-600/20 border-2 border-blue-500/40 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Ticket className="w-5 h-5 text-blue-400" />
-            <span className="text-slate-300 font-semibold">Tira 1-2-3</span>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-blue-300/70">Ganador:</span>
-              <span className="text-blue-300 font-bold">
-                ${amount.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-blue-300/70">Segundo:</span>
-              <span className="text-blue-300 font-bold">
-                ${amount.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-blue-300/70">Tercero:</span>
-              <span className="text-blue-300 font-bold">
-                ${amount.toLocaleString()}
-              </span>
-            </div>
-            <div className="h-px bg-blue-500/30 my-2"></div>
-            <div className="flex justify-between">
-              <span className="text-blue-200 font-semibold">Costo Total:</span>
-              <span className="text-2xl font-bold text-blue-300">
-                ${costoTotal.toLocaleString()}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Apuestas Directas - Mostrar vales */}
-      {isDirecta && amount > 0 && (
-        <div className="bg-gradient-to-r from-green-500/20 to-emerald-600/20 border-2 border-green-500/40 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Ticket className="w-5 h-5 text-green-400" />
-            <span className="text-slate-300 font-semibold">
-              Sistema de Vales
-            </span>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-green-300/70">Monto apostado:</span>
-              <span className="text-green-300 font-bold">
-                ${amount.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-green-300/70">÷ Dividendo:</span>
-              <span className="text-green-300 font-bold">${dividendo}</span>
-            </div>
-            <div className="h-px bg-green-500/30 my-2"></div>
-            <div className="flex justify-between">
-              <span className="text-green-200 font-semibold">
-                Vales Apostados:
-              </span>
-              <span className="text-2xl font-bold text-green-300">
-                {valesApostados} vales
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-green-300/70">Costo real:</span>
-              <span className="text-green-300 font-bold">
-                ${costoTotal.toLocaleString()}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Total a Apostar (para apuestas simples) */}
-      {isSimple && amount > 0 && (
-        <div className="bg-gradient-to-r from-fuchsia-500/20 to-fuchsia-600/20 border-2 border-fuchsia-500/40 rounded-xl p-4">
-          <div className="flex justify-between items-center">
-            <span className="text-slate-300 font-semibold">
-              Total a Apostar:
-            </span>
-            <span className="text-3xl font-bold text-fuchsia-300">
-              ${costoTotal.toLocaleString()}
-            </span>
-          </div>
+      {/* Mensaje de validación */}
+      {amount > 0 && !isAmountValid() && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+          <p className="text-red-300 text-sm">{getValidationMessage()}</p>
         </div>
       )}
 
       {/* Mensaje de éxito */}
-      {success && (
-        <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-500/40 rounded-xl p-4 animate-pulse">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-green-500/20 border border-green-500/30">
-              <Check className="w-6 h-6 text-green-400" />
-            </div>
-            <div>
-              <p className="text-green-300 font-bold text-lg">
-                ¡Apuesta registrada exitosamente! 🎉
-              </p>
-              <p className="text-green-400/80 text-sm">
-                Se descontaron ${costoTotal.toLocaleString()} de tu saldo
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mostrar errores */}
-      {error && (
-        <div className="bg-red-500/20 border-2 border-red-500/40 rounded-xl p-4">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-red-400" />
-            <p className="text-red-300 font-medium text-sm">{error}</p>
-          </div>
+      {amount > 0 && isAmountValid() && (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center gap-2">
+          <Check className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+          <p className="text-emerald-300 text-sm">
+            ¡Listo! Tu apuesta está lista para confirmar
+          </p>
         </div>
       )}
 
@@ -516,37 +309,20 @@ const BetAmount = ({
       <div className="flex gap-3 pt-2">
         <button
           onClick={onBack}
-          disabled={loading || success}
-          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-white font-semibold rounded-xl transition-all">
           <ChevronLeft className="w-5 h-5" />
           Volver
         </button>
         <button
-          onClick={handleConfirmBet}
-          disabled={
-            !canProceed || loading || success || costoTotal > currentSaldo
-          }
+          onClick={handleConfirm}
+          disabled={!canProceed || !isAmountValid()}
           className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all ${
-            canProceed && !loading && !success && costoTotal <= currentSaldo
-              ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 hover:from-fuchsia-500 hover:to-fuchsia-400 text-white shadow-lg shadow-fuchsia-500/30"
+            canProceed && isAmountValid()
+              ? "bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-500/20"
               : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
           }`}>
-          {loading ? (
-            <>
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              Procesando...
-            </>
-          ) : success ? (
-            <>
-              <Check className="w-5 h-5" />
-              ¡Confirmada!
-            </>
-          ) : (
-            <>
-              <Check className="w-5 h-5" />
-              Confirmar Apuesta
-            </>
-          )}
+          <Check className="w-5 h-5" />
+          Confirmar Apuesta
         </button>
       </div>
     </div>

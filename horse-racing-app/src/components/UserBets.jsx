@@ -11,8 +11,8 @@ import {
   TrendingUp,
   Loader2,
   RefreshCw,
-  CalendarDays,
-  History,
+  Filter,
+  Search,
 } from "lucide-react";
 import { db } from "../firebase/config";
 import { collection, query, onSnapshot } from "firebase/firestore";
@@ -21,12 +21,11 @@ const UserBets = ({ userId }) => {
   const [bets, setBets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
-  const [filter, setFilter] = useState("TODOS");
-  const [selectedRace, setSelectedRace] = useState("TODAS");
-  const [races, setRaces] = useState([]);
-  const [activeTab, setActiveTab] = useState("todas");
+  const [statusFilter, setStatusFilter] = useState("TODOS");
+  const [raceFilter, setRaceFilter] = useState("TODAS");
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Funciones de utilidad primero
+  // Utilidades
   const isToday = (fecha) => {
     if (!fecha) return false;
     try {
@@ -44,118 +43,120 @@ const UserBets = ({ userId }) => {
 
   const formatRaceDate = (fechaTimestamp) => {
     if (!fechaTimestamp) return "Sin fecha";
-
     try {
-      if (
-        fechaTimestamp.toDate &&
-        typeof fechaTimestamp.toDate === "function"
-      ) {
-        const date = fechaTimestamp.toDate();
-        return date.toLocaleDateString("es-AR", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        });
-      }
-
-      if (typeof fechaTimestamp === "number") {
-        const date = new Date(fechaTimestamp);
-        return date.toLocaleDateString("es-AR", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        });
-      }
-
-      if (typeof fechaTimestamp === "string") {
-        const date = new Date(fechaTimestamp);
-        return date.toLocaleDateString("es-AR", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        });
-      }
-
-      return "Fecha no disponible";
-    } catch (error) {
-      console.error("Error al formatear fecha de carrera:", error);
+      const date = fechaTimestamp.toDate ? fechaTimestamp.toDate() : new Date(fechaTimestamp);
+      return date.toLocaleDateString("es-AR", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
       return "Fecha inválida";
     }
   };
 
-  const updateStats = (betsData) => {
+  const formatDateTime = (timestamp) => {
+    if (!timestamp) return "Fecha desconocida";
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleDateString("es-AR", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "Fecha inválida";
+    }
+  };
+
+  const calculateStats = (betsData) => {
     const total = betsData.length;
     const pendientes = betsData.filter((b) => b.estado === "PENDIENTE").length;
     const ganadas = betsData.filter((b) => b.estado === "GANADA").length;
     const perdidas = betsData.filter((b) => b.estado === "PERDIDA").length;
-    const totalApostado = betsData.reduce(
-      (sum, b) => sum + (b.montoApostado || 0),
-      0
-    );
-    const totalGanado = betsData.reduce(
-      (sum, b) => sum + (b.gananciaReal || 0),
-      0
-    );
+    const totalApostado = betsData.reduce((sum, b) => sum + (b.montoApostado || 0), 0);
+    const totalGanado = betsData.reduce((sum, b) => sum + (b.gananciaReal || 0), 0);
+    const balance = totalGanado - totalApostado;
+    const winRate = total > 0 ? ((ganadas / total) * 100).toFixed(1) : 0;
 
-    // Calcular stats filtradas según el tab activo
-    const filteredByTab = betsData.filter((bet) => {
-      if (activeTab === "hoy") return isToday(bet.fecha);
-      if (activeTab === "jugadas") return bet.estado !== "PENDIENTE";
-      return true;
-    });
-
-    const filteredPendientes = filteredByTab.filter(
-      (b) => b.estado === "PENDIENTE"
-    ).length;
-    const filteredGanadas = filteredByTab.filter(
-      (b) => b.estado === "GANADA"
-    ).length;
-    const filteredPerdidas = filteredByTab.filter(
-      (b) => b.estado === "PERDIDA"
-    ).length;
-
-    setStats({
+    return {
       total,
       pendientes,
       ganadas,
       perdidas,
       totalApostado,
       totalGanado,
-      filteredPendientes,
-      filteredGanadas,
-      filteredPerdidas,
-    });
+      balance,
+      winRate,
+    };
+  };
 
-    // Extraer carreras únicas
+  const getUniqueRaces = (betsData) => {
     const uniqueRaces = {};
     betsData.forEach((bet) => {
-      const raceKey = `${bet.hipodromoNombre}-${
-        bet.numeroCarrera
-      }-${formatRaceDate(bet.fecha)}`;
+      const raceKey = `${bet.hipodromoNombre}-${bet.numeroCarrera}-${formatRaceDate(bet.fecha)}`;
       if (!uniqueRaces[raceKey]) {
         uniqueRaces[raceKey] = {
           hipodromo: bet.hipodromoNombre,
           numero: bet.numeroCarrera,
           fecha: bet.fecha,
-          hora: bet.hora,
           key: raceKey,
         };
       }
     });
 
-    setRaces(
-      Object.values(uniqueRaces).sort((a, b) => {
-        try {
-          const dateA = a.fecha?.toDate ? a.fecha.toDate() : new Date(a.fecha);
-          const dateB = b.fecha?.toDate ? b.fecha.toDate() : new Date(b.fecha);
-          return dateB - dateA;
-        } catch {
-          return 0;
-        }
-      })
-    );
+    return Object.values(uniqueRaces).sort((a, b) => {
+      try {
+        const dateA = a.fecha?.toDate ? a.fecha.toDate() : new Date(a.fecha);
+        const dateB = b.fecha?.toDate ? b.fecha.toDate() : new Date(b.fecha);
+        return dateB - dateA;
+      } catch {
+        return 0;
+      }
+    });
   };
 
+  // Configuración de estados
+  const getStatusConfig = (estado) => {
+    const configs = {
+      PENDIENTE: {
+        icon: Clock,
+        gradient: "from-yellow-500/20 to-amber-500/20",
+        border: "border-yellow-500/40",
+        text: "text-yellow-300",
+        label: "Pendiente",
+        emoji: "⏳",
+      },
+      GANADA: {
+        icon: CheckCircle,
+        gradient: "from-green-500/20 to-emerald-500/20",
+        border: "border-green-500/40",
+        text: "text-green-300",
+        label: "Ganada",
+        emoji: "✅",
+      },
+      PERDIDA: {
+        icon: XCircle,
+        gradient: "from-red-500/20 to-rose-500/20",
+        border: "border-red-500/40",
+        text: "text-red-300",
+        label: "Perdida",
+        emoji: "❌",
+      },
+      CANCELADA: {
+        icon: AlertCircle,
+        gradient: "from-slate-500/20 to-slate-600/20",
+        border: "border-slate-500/40",
+        text: "text-slate-300",
+        label: "Cancelada",
+        emoji: "⚠️",
+      },
+    };
+    return configs[estado] || configs.PENDIENTE;
+  };
+
+  // Cargar apuestas
   useEffect(() => {
     if (!userId) return;
 
@@ -170,11 +171,11 @@ const UserBets = ({ userId }) => {
           ...doc.data(),
         }));
         setBets(userBets);
-        updateStats(userBets);
+        setStats(calculateStats(userBets));
         setLoading(false);
       },
       (error) => {
-        console.error("Error al escuchar apuestas:", error);
+        console.error("Error al cargar apuestas:", error);
         setLoading(false);
       }
     );
@@ -182,75 +183,29 @@ const UserBets = ({ userId }) => {
     return () => unsubscribe();
   }, [userId]);
 
-  useEffect(() => {
-    if (bets.length > 0) {
-      updateStats(bets);
-    }
-  }, [activeTab]);
-
-  const getStatusConfig = (estado) => {
-    const configs = {
-      PENDIENTE: {
-        icon: Clock,
-        bg: "from-yellow-500/20 to-amber-500/20",
-        border: "border-yellow-500/40",
-        text: "text-yellow-300",
-        label: "Pendiente",
-      },
-      GANADA: {
-        icon: CheckCircle,
-        bg: "from-green-500/20 to-emerald-500/20",
-        border: "border-green-500/40",
-        text: "text-green-300",
-        label: "Ganada",
-      },
-      PERDIDA: {
-        icon: XCircle,
-        bg: "from-red-500/20 to-rose-500/20",
-        border: "border-red-500/40",
-        text: "text-red-300",
-        label: "Perdida",
-      },
-      CANCELADA: {
-        icon: AlertCircle,
-        bg: "from-slate-500/20 to-slate-600/20",
-        border: "border-slate-500/40",
-        text: "text-slate-300",
-        label: "Cancelada",
-      },
-    };
-    return configs[estado] || configs.PENDIENTE;
-  };
-
-  const formatDate = (timestamp) => {
-    if (!timestamp) return "Fecha desconocida";
-
-    try {
-      const date = new Date(timestamp);
-      return date.toLocaleDateString("es-AR", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch (error) {
-      console.error("Error al formatear fecha:", error);
-      return "Fecha inválida";
-    }
-  };
-
+  // Filtrado de apuestas
   const filteredBets = bets
     .filter((bet) => {
-      if (activeTab === "hoy" && !isToday(bet.fecha)) return false;
-      if (activeTab === "jugadas" && bet.estado === "PENDIENTE") return false;
-      if (filter !== "TODOS" && bet.estado !== filter) return false;
-      if (selectedRace !== "TODAS") {
-        const betRaceKey = `${bet.hipodromoNombre}-${
-          bet.numeroCarrera
-        }-${formatRaceDate(bet.fecha)}`;
-        if (betRaceKey !== selectedRace) return false;
+      // Filtro por estado
+      if (statusFilter !== "TODOS" && bet.estado !== statusFilter) return false;
+      
+      // Filtro por carrera
+      if (raceFilter !== "TODAS") {
+        const betRaceKey = `${bet.hipodromoNombre}-${bet.numeroCarrera}-${formatRaceDate(bet.fecha)}`;
+        if (betRaceKey !== raceFilter) return false;
       }
+      
+      // Filtro por búsqueda
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        return (
+          bet.hipodromoNombre?.toLowerCase().includes(search) ||
+          bet.tipoApuesta?.toLowerCase().includes(search) ||
+          bet.caballosTexto?.toLowerCase().includes(search) ||
+          bet.numeroCarrera?.toString().includes(search)
+        );
+      }
+      
       return true;
     })
     .sort((a, b) => {
@@ -263,16 +218,8 @@ const UserBets = ({ userId }) => {
       }
     });
 
-  const todayRaces = races.filter((race) => isToday(race.fecha));
-  const playedRaces = races.filter((race) => {
-    const raceBets = bets.filter(
-      (bet) =>
-        `${bet.hipodromoNombre}-${bet.numeroCarrera}-${formatRaceDate(
-          bet.fecha
-        )}` === race.key
-    );
-    return raceBets.some((bet) => bet.estado !== "PENDIENTE");
-  });
+  const races = getUniqueRaces(bets);
+  const selectedRaceData = races.find((r) => r.key === raceFilter);
 
   if (loading) {
     return (
@@ -286,379 +233,256 @@ const UserBets = ({ userId }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-3 sm:p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 sm:p-2.5 rounded-xl bg-gradient-to-br from-fuchsia-500 to-fuchsia-600 shadow-lg">
-              <Trophy className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+            <div className="p-3 rounded-xl bg-gradient-to-br from-fuchsia-500 to-fuchsia-600 shadow-lg">
+              <Trophy className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-2xl font-bold text-white">
-                Mis Apuestas
-              </h1>
-              <p className="text-slate-400 text-sm">Actualizadas en vivo 🔥</p>
+              <h1 className="text-3xl font-bold text-white">Mis Apuestas</h1>
+              <p className="text-slate-400 text-sm">Gestión completa de tus apuestas</p>
             </div>
           </div>
-          <button
+          {/* <button
             onClick={() => window.location.reload()}
-            className="p-2 sm:p-2.5 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-slate-300 transition-all">
-            <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
+            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-all">
+            <RefreshCw className="w-5 h-5" />
+          </button> */}
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats Grid */}
         {stats && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-            <div className="bg-gradient-to-br from-fuchsia-500/20 to-purple-500/20 border border-fuchsia-500/30 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Trophy className="w-4 h-4 text-fuchsia-400" />
-                <span className="text-slate-300 text-xs font-medium">
-                  Total
-                </span>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Trophy className="w-5 h-5 text-fuchsia-400" />
+                <span className="text-slate-400 text-sm">Total</span>
               </div>
-              <p className="text-2xl font-bold text-white">{stats.total}</p>
-              <p className="text-slate-400 text-[10px] mt-0.5">apuestas</p>
+              <p className="text-3xl font-bold text-white">{stats.total}</p>
+              <p className="text-slate-500 text-xs mt-1">apuestas realizadas</p>
             </div>
 
-            <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <DollarSign className="w-4 h-4 text-blue-400" />
-                <span className="text-slate-300 text-xs font-medium">
-                  Apostado
-                </span>
+            <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="w-5 h-5 text-blue-400" />
+                <span className="text-slate-400 text-sm">Apostado</span>
               </div>
-              <p className="text-xl font-bold text-blue-300">
+              <p className="text-2xl font-bold text-blue-300">
                 ${stats.totalApostado.toLocaleString()}
               </p>
-              <p className="text-slate-400 text-[10px] mt-0.5">inversión</p>
+              <p className="text-slate-500 text-xs mt-1">inversión total</p>
             </div>
 
-            <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <TrendingUp className="w-4 h-4 text-green-400" />
-                <span className="text-slate-300 text-xs font-medium">
-                  Ganado
-                </span>
+            <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-5 h-5 text-green-400" />
+                <span className="text-slate-400 text-sm">Ganado</span>
               </div>
-              <p className="text-xl font-bold text-green-300">
+              <p className="text-2xl font-bold text-green-300">
                 ${stats.totalGanado.toLocaleString()}
               </p>
-              <p className="text-slate-400 text-[10px] mt-0.5">ganancias</p>
+              <p className="text-slate-500 text-xs mt-1">en premios</p>
             </div>
 
-            <div
-              className={`bg-gradient-to-br ${
-                stats.totalGanado - stats.totalApostado >= 0
-                  ? "from-emerald-500/20 to-green-500/20 border-emerald-500/30"
-                  : "from-red-500/20 to-rose-500/20 border-red-500/30"
-              } border rounded-lg p-3`}>
-              <div className="flex items-center gap-1.5 mb-1">
-                <TrendingUp
-                  className={`w-4 h-4 ${
-                    stats.totalGanado - stats.totalApostado >= 0
-                      ? "text-emerald-400"
-                      : "text-red-400"
-                  }`}
-                />
-                <span className="text-slate-300 text-xs font-medium">
-                  Balance
-                </span>
+            <div className={`bg-slate-800/50 backdrop-blur border rounded-xl p-4 ${
+              stats.balance >= 0 ? "border-emerald-500/50" : "border-red-500/50"
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className={`w-5 h-5 ${stats.balance >= 0 ? "text-emerald-400" : "text-red-400"}`} />
+                <span className="text-slate-400 text-sm">Balance</span>
               </div>
-              <p
-                className={`text-xl font-bold ${
-                  stats.totalGanado - stats.totalApostado >= 0
-                    ? "text-emerald-300"
-                    : "text-red-300"
-                }`}>
-                ${(stats.totalGanado - stats.totalApostado).toLocaleString()}
+              <p className={`text-2xl font-bold ${stats.balance >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+                ${stats.balance.toLocaleString()}
               </p>
-              <p className="text-slate-400 text-[10px] mt-0.5">
-                {stats.total > 0
-                  ? `${((stats.ganadas / stats.total) * 100).toFixed(
-                      1
-                    )}% ganadas`
-                  : "sin datos"}
-              </p>
+              <p className="text-slate-500 text-xs mt-1">{stats.winRate}% efectividad</p>
             </div>
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex gap-2 border-b border-slate-700/50 pb-2 overflow-x-auto">
-          <button
-            onClick={() => {
-              setActiveTab("todas");
-              setSelectedRace("TODAS");
-              setFilter("TODOS");
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition-all whitespace-nowrap ${
-              activeTab === "todas"
-                ? "bg-fuchsia-500/20 text-fuchsia-300 border-b-2 border-fuchsia-500"
-                : "text-slate-400 hover:text-slate-300"
-            }`}>
-            <Trophy className="w-4 h-4" />
-            Todas las Carreras
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab("hoy");
-              setSelectedRace("TODAS");
-              setFilter("TODOS");
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition-all whitespace-nowrap ${
-              activeTab === "hoy"
-                ? "bg-blue-500/20 text-blue-300 border-b-2 border-blue-500"
-                : "text-slate-400 hover:text-slate-300"
-            }`}>
-            <CalendarDays className="w-4 h-4" />
-            Carreras de Hoy
-          </button>
-        </div>
+        {/* Filtros */}
+        <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl p-4 space-y-4">
+          <div className="flex items-center gap-2 text-slate-300 font-semibold">
+            <Filter className="w-5 h-5" />
+            <span>Filtros</span>
+          </div>
 
-        {/* Filters */}
-        <div className="space-y-3">
-          {/* Estado Filter */}
-          <div>
-            <label className="text-slate-400 text-xs font-medium mb-2 block">
-              Filtrar por estado
-            </label>
-            <div className="flex gap-1.5 overflow-x-auto pb-2">
-              {["TODOS", "PENDIENTE", "GANADA", "PERDIDA"].map((status) => {
-                let count = 0;
-                if (status === "PENDIENTE")
-                  count = stats?.filteredPendientes || 0;
-                else if (status === "GANADA")
-                  count = stats?.filteredGanadas || 0;
-                else if (status === "PERDIDA")
-                  count = stats?.filteredPerdidas || 0;
+          {/* Búsqueda */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar por hipódromo, carrera, caballos..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/50 focus:border-fuchsia-500"
+            />
+          </div>
 
-                return (
-                  <button
-                    key={status}
-                    onClick={() => setFilter(status)}
-                    className={`px-3 py-1.5 rounded-lg font-semibold text-xs whitespace-nowrap transition-all ${
-                      filter === status
-                        ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white shadow-lg"
-                        : "bg-slate-800/50 text-slate-300 border border-slate-700/50"
-                    }`}>
-                    {status === "TODOS" ? "Todas" : status}
-                    {status !== "TODOS" && (
-                      <span className="ml-1 opacity-75">({count})</span>
-                    )}
-                  </button>
-                );
-              })}
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* Filtro por Estado */}
+            <div>
+              <label className="text-slate-400 text-sm font-medium mb-2 block">Estado</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 rounded-lg px-4 py-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-fuchsia-500/50">
+                <option value="TODOS">Todos los estados ({stats?.total || 0})</option>
+                <option value="PENDIENTE">⏳ Pendientes ({stats?.pendientes || 0})</option>
+                <option value="GANADA">✅ Ganadas ({stats?.ganadas || 0})</option>
+                <option value="PERDIDA">❌ Perdidas ({stats?.perdidas || 0})</option>
+              </select>
+            </div>
+
+            {/* Filtro por Carrera */}
+            <div>
+              <label className="text-slate-400 text-sm font-medium mb-2 block">Carrera</label>
+              <select
+                value={raceFilter}
+                onChange={(e) => setRaceFilter(e.target.value)}
+                className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 rounded-lg px-4 py-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-fuchsia-500/50">
+                <option value="TODAS">Todas las carreras ({races.length})</option>
+                {races.map((race) => {
+                  const raceBets = bets.filter(
+                    (bet) => `${bet.hipodromoNombre}-${bet.numeroCarrera}-${formatRaceDate(bet.fecha)}` === race.key
+                  );
+                  return (
+                    <option key={race.key} value={race.key}>
+                      🏇 {race.hipodromo} - C#{race.numero} - {formatRaceDate(race.fecha)} ({raceBets.length})
+                    </option>
+                  );
+                })}
+              </select>
             </div>
           </div>
 
-          {/* Carrera Filter */}
-          {((activeTab === "todas" && races.length > 0) ||
-            (activeTab === "hoy" && todayRaces.length > 0) ||
-            (activeTab === "jugadas" && playedRaces.length > 0)) && (
-            <div>
-              <label className="text-slate-400 text-xs font-medium mb-2 block">
-                Filtrar por carrera
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-                <button
-                  onClick={() => setSelectedRace("TODAS")}
-                  className={`p-2 rounded-lg text-left transition-all ${
-                    selectedRace === "TODAS"
-                      ? "bg-gradient-to-r from-purple-600 to-purple-500 text-white shadow-lg"
-                      : "bg-slate-800/50 text-slate-300 border border-slate-700/50"
-                  }`}>
-                  <div className="flex items-center gap-2">
-                    <Trophy className="w-3.5 h-3.5 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-xs truncate">Todas</p>
-                      <p className="text-[10px] opacity-75">
-                        {activeTab === "todas"
-                          ? races.length
-                          : activeTab === "hoy"
-                          ? todayRaces.length
-                          : playedRaces.length}{" "}
-                        carreras
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {(activeTab === "todas"
-                  ? races
-                  : activeTab === "hoy"
-                  ? todayRaces
-                  : playedRaces
-                ).map((race) => {
-                  const raceBets = bets.filter(
-                    (bet) =>
-                      `${bet.hipodromoNombre}-${
-                        bet.numeroCarrera
-                      }-${formatRaceDate(bet.fecha)}` === race.key
-                  );
-                  return (
-                    <button
-                      key={race.key}
-                      onClick={() => setSelectedRace(race.key)}
-                      className={`p-3 rounded-lg transition-all w-full ${
-                        selectedRace === race.key
-                          ? "bg-gradient-to-r from-fuchsia-600 to-fuchsia-500 text-white shadow-lg"
-                          : "bg-slate-800/50 text-slate-300 border border-slate-700/50 hover:border-fuchsia-500/30"
-                      }`}>
-                      <div className="flex flex-col gap-2">
-                        {/* Hipódromo */}
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 opacity-80 flex-shrink-0" />
-                          <span className="font-bold text-sm truncate">
-                            {race.hipodromo}
-                          </span>
-                        </div>
-
-                        {/* Carrera */}
-                        <div className="flex items-center gap-2">
-                          <Trophy className="w-4 h-4 opacity-80" />
-                          <span className="font-semibold text-sm">
-                            Carrera #{race.numero}
-                          </span>
-                        </div>
-
-                        {/* Fecha */}
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 opacity-80" />
-                          <span className="text-sm">
-                            {formatRaceDate(race.fecha)}
-                          </span>
-                        </div>
-
-                        {/* Cantidad de apuestas */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs bg-slate-700/40 px-2 py-0.5 rounded-md">
-                            {raceBets.length} apuestas
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
+          {/* Info de carrera seleccionada */}
+          {selectedRaceData && (
+            <div className="bg-gradient-to-br from-fuchsia-600/20 to-fuchsia-500/20 border border-fuchsia-500/30 rounded-lg p-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-fuchsia-400" />
+                  <span className="text-slate-300">{selectedRaceData.hipodromo}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-fuchsia-400" />
+                  <span className="text-slate-300">Carrera #{selectedRaceData.numero}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-fuchsia-400" />
+                  <span className="text-slate-300">{formatRaceDate(selectedRaceData.fecha)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-fuchsia-300 font-semibold">
+                    {bets.filter(b => `${b.hipodromoNombre}-${b.numeroCarrera}-${formatRaceDate(b.fecha)}` === raceFilter).length} apuestas
+                  </span>
+                </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Bets List */}
-        <div className="space-y-3">
+        {/* Lista de Apuestas */}
+        <div className="space-y-4">
           {filteredBets.length === 0 ? (
-            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-8 text-center">
-              <Trophy className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-              <h3 className="text-lg font-bold text-slate-400 mb-2">
-                No hay apuestas
-              </h3>
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-12 text-center">
+              <Trophy className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-slate-400 mb-2">No se encontraron apuestas</h3>
               <p className="text-sm text-slate-500">
-                {activeTab === "hoy"
-                  ? "No tienes apuestas para carreras de hoy"
-                  : activeTab === "jugadas"
-                  ? "Aún no has realizado ninguna apuesta"
-                  : `No tienes apuestas con estado: ${filter}`}
+                {searchTerm
+                  ? "Intenta con otros términos de búsqueda"
+                  : "No hay apuestas que coincidan con los filtros seleccionados"}
               </p>
             </div>
           ) : (
-            filteredBets.map((bet) => {
-              const statusConfig = getStatusConfig(bet.estado);
-              const StatusIcon = statusConfig.icon;
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-slate-400 text-sm">
+                  Mostrando <span className="text-white font-semibold">{filteredBets.length}</span> de{" "}
+                  <span className="text-white font-semibold">{stats.total}</span> apuestas
+                </p>
+              </div>
 
-              return (
-                <div
-                  key={bet.id}
-                  className={`bg-gradient-to-br ${statusConfig.bg} border ${statusConfig.border} rounded-xl p-4 space-y-3 hover:shadow-xl transition-all`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`p-2 rounded-lg bg-slate-900/70 border ${statusConfig.border}`}>
-                        <StatusIcon
-                          className={`w-4 h-4 ${statusConfig.text}`}
-                        />
+              {filteredBets.map((bet) => {
+                const config = getStatusConfig(bet.estado);
+                const StatusIcon = config.icon;
+
+                return (
+                  <div
+                    key={bet.id}
+                    className={`bg-gradient-to-br ${config.gradient} border ${config.border} rounded-xl p-5 hover:shadow-2xl transition-all`}>
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2.5 rounded-lg bg-slate-900/70 border ${config.border}`}>
+                          <StatusIcon className={`w-5 h-5 ${config.text}`} />
+                        </div>
+                        <div>
+                          <h3 className={`font-bold text-base ${config.text}`}>{bet.tipoApuesta}</h3>
+                          <p className="text-slate-400 text-xs flex items-center gap-1 mt-0.5">
+                            <Clock className="w-3 h-3" />
+                            {formatDateTime(bet.timestamp)}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3
-                          className={`font-bold text-sm ${statusConfig.text}`}>
-                          {bet.tipoApuesta}
-                        </h3>
-                        <p className="text-slate-400 text-[10px] flex items-center gap-1">
-                          <Clock className="w-2.5 h-2.5" />
-                          {formatDate(bet.timestamp)}
-                        </p>
+                      <span className={`px-3 py-1.5 rounded-lg border ${config.border} ${config.text} text-xs font-bold`}>
+                        {config.label}
+                      </span>
+                    </div>
+
+                    {/* Info Grid */}
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                        <div className="flex items-center gap-2 mb-1">
+                          <MapPin className="w-4 h-4 text-blue-400" />
+                          <span className="text-slate-500 text-xs">Hipódromo</span>
+                        </div>
+                        <p className="text-white font-semibold text-sm truncate">{bet.hipodromoNombre}</p>
+                      </div>
+
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Trophy className="w-4 h-4 text-purple-400" />
+                          <span className="text-slate-500 text-xs">Carrera</span>
+                        </div>
+                        <p className="text-white font-semibold text-sm">#{bet.numeroCarrera}</p>
+                      </div>
+
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Calendar className="w-4 h-4 text-fuchsia-400" />
+                          <span className="text-slate-500 text-xs">Fecha</span>
+                        </div>
+                        <p className="text-white font-semibold text-xs truncate">{formatRaceDate(bet.fecha)}</p>
                       </div>
                     </div>
-                    <div
-                      className={`px-2.5 py-1 rounded-lg border ${statusConfig.border} ${statusConfig.text} text-[10px] font-bold`}>
-                      {statusConfig.label}
+
+                    {/* Caballos */}
+                    <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50 mb-4">
+                      <p className="text-slate-400 text-xs mb-1.5 font-medium">Caballos seleccionados:</p>
+                      <p className="text-white font-semibold text-sm">{bet.caballosTexto || "No disponible"}</p>
+                    </div>
+
+                    {/* Montos */}
+                    <div className={`grid ${bet.estado === "GANADA" && bet.gananciaReal > 0 ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
+                      <div className="bg-gradient-to-br from-fuchsia-500/10 to-purple-500/10 rounded-lg p-3 border border-fuchsia-500/30">
+                        <p className="text-slate-400 text-xs mb-1">Monto apostado</p>
+                        <p className="text-fuchsia-300 font-bold text-2xl">${bet.montoApostado?.toLocaleString() || "0"}</p>
+                      </div>
+
+                      {bet.estado === "GANADA" && bet.gananciaReal > 0 && (
+                        <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-500/30">
+                          <p className="text-slate-400 text-xs mb-1">Ganancia obtenida</p>
+                          <p className="text-green-300 font-bold text-2xl">${bet.gananciaReal?.toLocaleString() || "0"}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <MapPin className="w-3 h-3 text-blue-400" />
-                        <p className="text-slate-500 text-[10px]">Hipódromo</p>
-                      </div>
-                      <p className="text-white font-bold text-xs truncate">
-                        {bet.hipodromoNombre}
-                      </p>
-                    </div>
-
-                    <div className="bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Trophy className="w-3 h-3 text-purple-400" />
-                        <p className="text-slate-500 text-[10px]">Carrera</p>
-                      </div>
-                      <p className="text-white font-bold text-xs">
-                        #{bet.numeroCarrera}
-                      </p>
-                    </div>
-
-                    <div className="bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Calendar className="w-3 h-3 text-fuchsia-400" />
-                        <p className="text-slate-500 text-[10px]">Fecha</p>
-                      </div>
-                      <p className="text-white font-bold text-[10px] truncate">
-                        {formatRaceDate(bet.fecha)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-900/50 rounded-lg p-2 border border-slate-700/50">
-                    <p className="text-slate-400 text-[10px] mb-1">Caballos:</p>
-                    <p className="text-white font-semibold text-xs">
-                      {bet.caballosTexto || "No disponible"}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-gradient-to-br from-fuchsia-500/10 to-purple-500/10 rounded-lg p-2 border border-fuchsia-500/30">
-                      <p className="text-slate-400 text-[10px] mb-0.5">
-                        Apostado
-                      </p>
-                      <p className="text-fuchsia-300 font-bold text-lg">
-                        ${bet.montoApostado?.toLocaleString() || "0"}
-                      </p>
-                    </div>
-
-                    {bet.estado === "GANADA" && bet.gananciaReal > 0 && (
-                      <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-lg p-2 border border-green-500/30">
-                        <p className="text-slate-400 text-[10px] mb-0.5">
-                          Ganancia
-                        </p>
-                        <p className="text-green-300 font-bold text-lg">
-                          ${bet.gananciaReal?.toLocaleString() || "0"}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </>
           )}
         </div>
       </div>

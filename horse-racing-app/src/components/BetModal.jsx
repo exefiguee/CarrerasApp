@@ -1,19 +1,20 @@
 import { useState, useEffect } from "react";
-import {
-  X,
-  ChevronLeft,
-  Check,
-  Trophy,
-  Target,
-  Medal,
-  Sparkles,
-  ArrowRight,
-} from "lucide-react";
+import { X, ChevronLeft, Trophy } from "lucide-react";
 import BetTypeSelector from "./BetTypeSelector";
 import HorseSelector from "./HorseSelector";
 import BetAmount from "./BetAmount";
 import { db } from "../firebase/config";
 import { doc, onSnapshot } from "firebase/firestore";
+
+// 🔧 Función auxiliar para calcular factorial
+const factorial = (n) => {
+  if (n <= 1) return 1;
+  let result = 1;
+  for (let i = 2; i <= n; i++) {
+    result *= i;
+  }
+  return result;
+};
 
 const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
   const [step, setStep] = useState(1);
@@ -32,18 +33,14 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
     "TIRA(1,2,3)",
     "EXACTA",
     "IMPERFECTA",
-    "IMPERFECTA C",
     "TRIFECTA D",
     "TRIFECTA C",
     "CUATRIFECTA D",
     "CUATRIFECTA C",
-    "QUINTEX D",
-    "QUINTEX C",
     "DOBLE",
     "TRIPLO",
     "PICK 4",
     "PICK 5",
-    "PICK 6",
   ];
 
   // 🔥 Listener en tiempo real para la carrera seleccionada
@@ -84,7 +81,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
     };
   }, [race?.firebaseId]);
 
-  // 🔥 Cargar tipos de apuesta desde Firestore
+  // 🔥 Configuración CORRECTA de tipos de apuesta
   useEffect(() => {
     if (!currentRaceData || !currentRaceData.tiposApuestas) {
       console.warn("⚠️ No hay tiposApuestas en la carrera");
@@ -94,164 +91,162 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
 
     console.log("📊 Cargando tipos de apuesta desde Firestore");
 
-    // Configuración de cada tipo de apuesta
+    // ✅ Configuración correcta de cada tipo de apuesta
     const betTypeConfig = {
       GANADOR: {
         maxHorses: 1,
         minHorses: 1,
         type: "simple",
-        description: "Selecciona 1 caballo a ganador",
+        selectionMode: "single",
+        description: "Selecciona 1 caballo ganador",
+        howItWorks: "El caballo debe llegar en 1° lugar",
       },
       SEGUNDO: {
         maxHorses: 1,
         minHorses: 1,
         type: "simple",
+        selectionMode: "single",
         description: "Selecciona 1 caballo a segundo",
+        howItWorks: "El caballo debe llegar en 2° lugar",
       },
       TERCERO: {
         maxHorses: 1,
         minHorses: 1,
         type: "simple",
+        selectionMode: "single",
         description: "Selecciona 1 caballo a tercero",
+        howItWorks: "El caballo debe llegar en 3° lugar",
       },
       "TIRA(1,2,3)": {
-        maxHorses: 3,
-        minHorses: 1,
+        maxHorses: 1, // ✅ CORREGIDO: Solo 1 caballo
+        minHorses: 1, // ✅ CORREGIDO
         type: "tira",
-        description: "1 caballo a los 3 puestos (ganador, segundo y tercero)",
+        selectionMode: "single",
+        multiplier: 3, // Se multiplica x3
+        description: "1 caballo para ganador, segundo Y tercero",
+        howItWorks: "El caballo debe llegar en los 3 primeros puestos. Son 3 apuestas en 1.",
       },
       EXACTA: {
         maxHorses: 10,
         minHorses: 2,
-        type: "combinada",
+        type: "combinada-por-posicion",
         positions: 2,
-        description: "Caballos para 1° y 2° puesto (en orden)",
+        selectionMode: "grouped-positions",
+        description: "Varios caballos para 1° y varios para 2° (EN ORDEN)",
+        howItWorks: "Selecciona caballos para 1° puesto y caballos para 2° puesto. Se generan todas las combinaciones (1° × 2°)",
       },
       IMPERFECTA: {
         maxHorses: 10,
         minHorses: 2,
-        type: "combinada",
+        type: "combinada-por-posicion",
         positions: 2,
-        ordered: false,
-        description: "Caballos para 1° y 2° puesto (sin orden)",
-      },
-      "IMPERFECTA C": {
-        maxHorses: 10,
-        minHorses: 2,
-        type: "combinada-multiple",
-        positions: 2,
-        ordered: false,
-        description: "Varios caballos para 1° y 2° (combinaciones)",
+        selectionMode: "grouped-positions",
+        description: "Varios caballos para 1° y varios para 2° (EN ORDEN)",
+        howItWorks: "Igual que EXACTA. Selecciona grupos de caballos para 1° y 2° puesto",
       },
       "TRIFECTA D": {
         maxHorses: 3,
         minHorses: 3,
         type: "directa",
         positions: 3,
-        description: "3 caballos en orden: 1°, 2° y 3°",
+        selectionMode: "ordered-direct",
+        description: "1 caballo para 1°, 1 para 2°, 1 para 3° (EN ORDEN)",
+        howItWorks: "Selecciona exactamente 3 caballos en orden. El 1° que elijas debe llegar 1°, el 2° debe llegar 2°, etc.",
       },
       "TRIFECTA C": {
         maxHorses: 10,
         minHorses: 3,
-        type: "combinada-multiple",
+        type: "combinada-ordenada",
         positions: 3,
-        description: "Varios caballos para los 3 primeros puestos",
+        selectionMode: "ordered-combination",
+        description: "Varios caballos para los 3 primeros puestos (Combinada)",
+        howItWorks: "Selecciona 3 o más caballos. Se generan todas las combinaciones posibles de 3 caballos en orden",
       },
       "CUATRIFECTA D": {
         maxHorses: 4,
         minHorses: 4,
         type: "directa",
         positions: 4,
-        description: "4 caballos en orden: 1°, 2°, 3° y 4°",
+        selectionMode: "ordered-direct",
+        description: "1 caballo para 1°, 1 para 2°, 1 para 3°, 1 para 4° (EN ORDEN)",
+        howItWorks: "Selecciona exactamente 4 caballos en orden de llegada",
       },
       "CUATRIFECTA C": {
         maxHorses: 10,
         minHorses: 4,
-        type: "combinada-multiple",
+        type: "combinada-ordenada",
         positions: 4,
-        description: "Varios caballos para los 4 primeros puestos",
-      },
-      "QUINTEX D": {
-        maxHorses: 5,
-        minHorses: 5,
-        type: "directa",
-        positions: 5,
-        description: "5 caballos en orden: 1°, 2°, 3°, 4° y 5°",
-      },
-      "QUINTEX C": {
-        maxHorses: 10,
-        minHorses: 5,
-        type: "combinada-multiple",
-        positions: 5,
-        description: "Varios caballos para los 5 primeros puestos",
+        selectionMode: "ordered-combination",
+        description: "Varios caballos para los 4 primeros puestos (Combinada)",
+        howItWorks: "Selecciona 4 o más caballos. Se generan todas las permutaciones de 4 caballos",
       },
       DOBLE: {
         maxHorses: 10,
         minHorses: 1,
         type: "multiple-races",
         races: 2,
-        description: "Ganadores de 2 carreras seguidas",
+        selectionMode: "multi-race",
+        description: "Ganadores de 2 carreras consecutivas",
+        howItWorks: "Selecciona caballos ganadores en esta carrera y la siguiente",
+        requiresNextRace: true,
       },
       TRIPLO: {
         maxHorses: 10,
         minHorses: 1,
         type: "multiple-races",
         races: 3,
-        description: "Ganadores de 3 carreras seguidas",
+        selectionMode: "multi-race",
+        description: "Ganadores de 3 carreras consecutivas",
+        requiresNextRace: true,
       },
       "PICK 4": {
         maxHorses: 10,
         minHorses: 1,
         type: "multiple-races",
         races: 4,
-        description: "Ganadores de 4 carreras seguidas",
+        selectionMode: "multi-race",
+        description: "Ganadores de 4 carreras consecutivas",
+        requiresNextRace: true,
       },
       "PICK 5": {
         maxHorses: 10,
         minHorses: 1,
         type: "multiple-races",
         races: 5,
-        description: "Ganadores de 5 carreras seguidas",
-      },
-      "PICK 6": {
-        maxHorses: 10,
-        minHorses: 1,
-        type: "multiple-races",
-        races: 6,
-        description: "Ganadores de 6 carreras seguidas",
+        selectionMode: "multi-race",
+        description: "Ganadores de 5 carreras consecutivas",
+        requiresNextRace: true,
       },
     };
 
     // Filtrar solo los tipos habilitados en Firestore
     const enabledTypesTemp = {};
 
-    Object.entries(currentRaceData.tiposApuestas).forEach(
-      ([key, isEnabled]) => {
-        if (isEnabled !== true) {
-          console.log(`❌ ${key} está en FALSE - NO se mostrará`);
-          return;
-        }
-
-        if (betTypeConfig[key]) {
-          const normalizedKey = key.replace(/[(),\s]/g, "_").toUpperCase();
-          const keyWithOne = key.replace(/\s/g, "") + "1";
-
-          const limites = currentRaceData.limitesApuestas?.[keyWithOne] || {
-            apuestaMinima: 200,
-            apuestaMaxima: 50000,
-          };
-
-          enabledTypesTemp[normalizedKey] = {
-            label: key,
-            originalKey: key,
-            ...betTypeConfig[key],
-            apuestaMinima: limites.apuestaMinima || 200,
-            apuestaMaxima: limites.apuestaMaxima || 50000,
-          };
-          console.log(`✅ ${key} habilitado con límites:`, limites);
-        }
+    Object.entries(currentRaceData.tiposApuestas).forEach(([key, isEnabled]) => {
+      if (isEnabled !== true) {
+        console.log(`❌ ${key} está en FALSE - NO se mostrará`);
+        return;
       }
-    );
+
+      if (betTypeConfig[key]) {
+        const normalizedKey = key.replace(/[(),\s]/g, "_").toUpperCase();
+        const keyWithOne = key.replace(/\s/g, "") + "1";
+
+        const limites = currentRaceData.limitesApuestas?.[keyWithOne] || {
+          apuestaMinima: 200,
+          apuestaMaxima: 50000,
+        };
+
+        enabledTypesTemp[normalizedKey] = {
+          label: key,
+          originalKey: key,
+          ...betTypeConfig[key],
+          apuestaMinima: limites.apuestaMinima || 200,
+          apuestaMaxima: limites.apuestaMaxima || 50000,
+        };
+        console.log(`✅ ${key} habilitado con límites:`, limites);
+      }
+    });
 
     // Ordenar según BET_TYPE_ORDER
     const orderedBetTypes = {};
@@ -271,40 +266,108 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
     console.log("🎯 Tipo seleccionado:", type);
     setBetType(type);
     setSelectedHorses([]);
+    setAmount(0);
     setStep(2);
   };
 
-  const handleHorsesSelected = (horses) => {
-    console.log("🐴 Caballos seleccionados:", horses);
-    setSelectedHorses(horses);
+const handleHorsesSelected = (horses) => {
+    // Si la selección viene como un objeto (apuestas agrupadas), lo guardamos tal cual.
+    // De lo contrario, asumimos que es un array de caballos (apuestas normales).
+    const newSelection = Array.isArray(horses) ? horses : horses; // Mantiene el array o el objeto
+    
+    setSelectedHorses(newSelection);
     setStep(3);
   };
-
   const handleConfirmBet = () => {
     console.log("✅ Apuesta confirmada:", {
       betType,
       selectedHorses,
       amount,
+      betTypeConfig: betTypes[betType],
     });
+    
+    // Aquí iría la lógica para guardar la apuesta en Firestore
+    // Por ahora solo cerramos el modal
     onClose();
   };
 
-  const canProceed = () => {
+ const canProceed = () => {
+    // Paso 2: Selección de Caballos
     if (step === 2) {
       const config = betTypes[betType];
+
+      // 🎯 Lógica para apuestas con grupos por posición (EXACTA, IMPERFECTA)
+      if (config.selectionMode === "grouped-positions") {
+        // La selección es un objeto { position1: [...], position2: [...] }
+        const group1Count = selectedHorses.position1?.length || 0;
+        const group2Count = selectedHorses.position2?.length || 0;
+        
+        // Requerimos al menos 1 caballo en cada posición.
+        return group1Count >= 1 && group2Count >= 1; 
+      }
+
+      // Lógica para el resto de apuestas (GANADOR, SEGUNDO, TERCERO, etc.)
+      // Aseguramos que selectedHorses sea un array para usar .length
+      const horseArrayLength = Array.isArray(selectedHorses) ? selectedHorses.length : 0;
+      
       return (
-        selectedHorses.length >= config.minHorses &&
-        selectedHorses.length <= config.maxHorses
-      );  
-    }
-    if (step === 3) {
+        horseArrayLength >= config.minHorses &&
+        horseArrayLength <= config.maxHorses
+      );
+    } 
+    
+    // Paso 3: Monto de la Apuesta
+    else if (step === 3) {
       const config = betTypes[betType];
       const minAmount = config?.apuestaMinima || 200;
       const maxAmount = config?.apuestaMaxima || 50000;
-      return (
-        amount >= minAmount && amount <= maxAmount && amount <= (userSaldo || 0)
-      );
+      
+      // La variable 'amount' debe ser definida y accesible aquí (asumo que está en el scope del componente)
+      if (amount <= 0) return false;
+
+      // ⚠️ Validación del rango de la apuesta
+      if (amount < minAmount || amount > maxAmount) return false;
+
+
+      // Función auxiliar para calcular el monto total y verificar si es válido
+      const calculateTotalAmount = () => {
+        const n = Array.isArray(selectedHorses) ? selectedHorses.length : 0;
+        let combinaciones = 1;
+
+        // 🔥 CORRECCIÓN: Cálculo de combinaciones para grupos por posición
+        if (config.selectionMode === "grouped-positions") {
+          const group1Count = selectedHorses.position1?.length || 0;
+          const group2Count = selectedHorses.position2?.length || 0;
+          combinaciones = group1Count * group2Count;
+        }
+        else if (config.type === "tira") {
+          combinaciones = 3;
+        } else if (config.selectionMode === "ordered-direct") {
+          combinaciones = 1;
+        } else if (config.selectionMode === "ordered-combination" && config.positions === 3) {
+          if (n >= 3) {
+            // Nota: La función 'factorial' debe estar definida en el scope
+            combinaciones = factorial(n) / factorial(n - 3);
+          }
+        } else if (config.selectionMode === "ordered-combination" && config.positions === 4) {
+          if (n >= 4) {
+            combinaciones = factorial(n) / factorial(n - 4);
+          }
+        }  
+        else if (config.selectionMode === "multi-race") {
+          combinaciones = Math.pow(n, config.races || 1);
+        }
+
+        return amount * combinaciones * (config.multiplier || 1);
+      };
+      
+      // ✅ Si el cálculo del monto total es válido y mayor a cero, se puede proceder.
+      const totalAmount = calculateTotalAmount();
+      
+      return totalAmount > 0;
     }
+    
+    // Para cualquier otro paso no cubierto, asumimos que se puede continuar
     return true;
   };
 
@@ -341,8 +404,7 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
               </span>
               <span className="text-slate-500">•</span>
               <span className="text-slate-400">
-                Carrera{" "}
-                {currentRaceData.raceNumber || currentRaceData.num_carrera}
+                Carrera {currentRaceData.raceNumber || currentRaceData.num_carrera}
               </span>
             </div>
             <div className="text-xs text-slate-400">
