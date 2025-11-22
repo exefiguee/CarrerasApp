@@ -188,13 +188,13 @@ const UserBets = ({ userId }) => {
     .filter((bet) => {
       // Filtro por estado
       if (statusFilter !== "TODOS" && bet.estado !== statusFilter) return false;
-      
+
       // Filtro por carrera
       if (raceFilter !== "TODAS") {
         const betRaceKey = `${bet.hipodromoNombre}-${bet.numeroCarrera}-${formatRaceDate(bet.fecha)}`;
         if (betRaceKey !== raceFilter) return false;
       }
-      
+
       // Filtro por búsqueda
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
@@ -205,7 +205,7 @@ const UserBets = ({ userId }) => {
           bet.numeroCarrera?.toString().includes(search)
         );
       }
-      
+
       return true;
     })
     .sort((a, b) => {
@@ -287,9 +287,8 @@ const UserBets = ({ userId }) => {
               <p className="text-slate-500 text-xs mt-1">en premios</p>
             </div>
 
-            <div className={`bg-slate-800/50 backdrop-blur border rounded-xl p-4 ${
-              stats.balance >= 0 ? "border-emerald-500/50" : "border-red-500/50"
-            }`}>
+            <div className={`bg-slate-800/50 backdrop-blur border rounded-xl p-4 ${stats.balance >= 0 ? "border-emerald-500/50" : "border-red-500/50"
+              }`}>
               <div className="flex items-center gap-2 mb-2">
                 <TrendingUp className={`w-5 h-5 ${stats.balance >= 0 ? "text-emerald-400" : "text-red-400"}`} />
                 <span className="text-slate-400 text-sm">Balance</span>
@@ -408,77 +407,63 @@ const UserBets = ({ userId }) => {
               {filteredBets.map((bet) => {
                 const config = getStatusConfig(bet.estado);
                 const StatusIcon = config.icon;
+                const hasWinnings = bet.estado === "GANADA" && bet.gananciaReal > 0;
 
                 return (
-                  <div
-                    key={bet.id}
-                    className={`bg-gradient-to-br ${config.gradient} border ${config.border} rounded-xl p-5 hover:shadow-2xl transition-all`}>
+                  <div key={bet.id} className={`bg-gradient-to-br ${config.gradient} border ${config.border} rounded-lg p-3.5 hover:shadow-xl transition-all`}>
                     {/* Header */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2.5 rounded-lg bg-slate-900/70 border ${config.border}`}>
-                          <StatusIcon className={`w-5 h-5 ${config.text}`} />
+                    <div className="flex items-start justify-between mb-2.5 gap-3">
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                        <div className={`p-1.5 rounded-lg bg-slate-900/60 border ${config.border} flex-shrink-0`}>
+                          <StatusIcon className={`w-4 h-4 ${config.text}`} />
                         </div>
-                        <div>
-                          <h3 className={`font-bold text-base ${config.text}`}>{bet.tipoApuesta}</h3>
-                          <p className="text-slate-400 text-xs flex items-center gap-1 mt-0.5">
-                            <Clock className="w-3 h-3" />
-                            {formatDateTime(bet.timestamp)}
-                          </p>
+                        <div className="min-w-0 flex-1">
+                          <h3 className={`font-bold text-sm ${config.text} mb-1.5`}>{bet.tipoApuesta}</h3>
+
+                          {/* Datos de la Carrera */}
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                            <div className="flex items-center gap-1">
+                              <span className="text-slate-500">Hipódromo:</span>
+                              <span className="text-white font-semibold">{bet.hipodromoNombre}</span>
+                            </div>
+                            <span className="text-slate-600">•</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-slate-500">Carrera:</span>
+                              <span className="text-white font-semibold">#{bet.numeroCarrera}</span>
+                            </div>
+                            <span className="text-slate-600">•</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-slate-500">Fecha:</span>
+                              <span className="text-white font-semibold">{formatRaceDate(bet.fecha)}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <span className={`px-3 py-1.5 rounded-lg border ${config.border} ${config.text} text-xs font-bold`}>
-                        {config.label}
-                      </span>
-                    </div>
 
-                    {/* Info Grid */}
-                    <div className="grid grid-cols-3 gap-3 mb-4">
-                      <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
-                        <div className="flex items-center gap-2 mb-1">
-                          <MapPin className="w-4 h-4 text-blue-400" />
-                          <span className="text-slate-500 text-xs">Hipódromo</span>
+                      <div className="text-right flex-shrink-0">
+                        <span className={`inline-block px-2.5 py-1 rounded-md border ${config.border} ${config.text} text-xs font-semibold mb-1.5 whitespace-nowrap`}>
+                          {config.label}
+                        </span>
+                        <div className="bg-gradient-to-br from-fuchsia-500/10 to-purple-500/10 rounded-md px-2.5 py-1.5 border border-fuchsia-500/30">
+                          <p className="text-slate-400 text-xs leading-none">Apostado</p>
+                          <p className="text-fuchsia-300 font-bold text-base mt-0.5 whitespace-nowrap">${bet.montoApostado?.toLocaleString() || "0"}</p>
                         </div>
-                        <p className="text-white font-semibold text-sm truncate">{bet.hipodromoNombre}</p>
-                      </div>
-
-                      <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Trophy className="w-4 h-4 text-purple-400" />
-                          <span className="text-slate-500 text-xs">Carrera</span>
-                        </div>
-                        <p className="text-white font-semibold text-sm">#{bet.numeroCarrera}</p>
-                      </div>
-
-                      <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Calendar className="w-4 h-4 text-fuchsia-400" />
-                          <span className="text-slate-500 text-xs">Fecha</span>
-                        </div>
-                        <p className="text-white font-semibold text-xs truncate">{formatRaceDate(bet.fecha)}</p>
                       </div>
                     </div>
 
                     {/* Caballos */}
-                    <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50 mb-4">
-                      <p className="text-slate-400 text-xs mb-1.5 font-medium">Caballos seleccionados:</p>
-                      <p className="text-white font-semibold text-sm">{bet.caballosTexto || "No disponible"}</p>
+                    <div className="bg-slate-900/40 rounded-md px-3 py-2 border border-slate-700/50">
+                      <p className="text-slate-500 text-xs mb-1">Caballos seleccionados</p>
+                      <p className="text-white text-sm font-semibold leading-snug break-words">{bet.caballosTexto || "No disponible"}</p>
                     </div>
 
-                    {/* Montos */}
-                    <div className={`grid ${bet.estado === "GANADA" && bet.gananciaReal > 0 ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
-                      <div className="bg-gradient-to-br from-fuchsia-500/10 to-purple-500/10 rounded-lg p-3 border border-fuchsia-500/30">
-                        <p className="text-slate-400 text-xs mb-1">Monto apostado</p>
-                        <p className="text-fuchsia-300 font-bold text-2xl">${bet.montoApostado?.toLocaleString() || "0"}</p>
+                    {/* Ganancia */}
+                    {hasWinnings && (
+                      <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-md px-3 py-2 border border-green-500/30 mt-2.5">
+                        <p className="text-slate-400 text-xs mb-1">Ganancia obtenida</p>
+                        <p className="text-green-300 font-bold text-lg">${bet.gananciaReal?.toLocaleString() || "0"}</p>
                       </div>
-
-                      {bet.estado === "GANADA" && bet.gananciaReal > 0 && (
-                        <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-500/30">
-                          <p className="text-slate-400 text-xs mb-1">Ganancia obtenida</p>
-                          <p className="text-green-300 font-bold text-2xl">${bet.gananciaReal?.toLocaleString() || "0"}</p>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
                 );
               })}

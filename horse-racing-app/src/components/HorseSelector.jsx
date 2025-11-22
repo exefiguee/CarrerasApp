@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronLeft, Check, AlertCircle, Info } from "lucide-react";
+import { db } from "../firebase/config";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
 
 const HorseSelector = ({
   horses,
@@ -19,12 +21,24 @@ const HorseSelector = ({
     position4: [],
   });
 
+  const [currentRace, setCurrentRace] = useState(1);
+  const [groupedRaces, setGroupedRaces] = useState({
+    race1: [],
+    race2: [],
+    race3: [],
+    race4: [],
+    race5: [],
+  });
+  const [nextRaces, setNextRaces] = useState([]);
+  const [loadingNextRaces, setLoadingNextRaces] = useState(false);
+
   console.log("🐴 HorseSelector - Tipo de apuesta:", betType);
   console.log("🔧 Configuración:", betTypeConfig);
   console.log("🐴 Caballos seleccionados:", selectedHorses);
   console.log("📊 Grupos por posición:", groupedPositions);
+  console.log("🏇 Grupos por carrera:", groupedRaces);
+  console.log("📋 Carreras siguientes:", nextRaces);
 
-  // 🔥 Validación de datos
   if (!horses || horses.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -47,21 +61,154 @@ const HorseSelector = ({
     );
   }
 
-  // 🎯 Determinar el modo de selección
   const selectionMode = betTypeConfig?.selectionMode || "single";
   const isSimple = selectionMode === "single";
   const isOrderedDirect = selectionMode === "ordered-direct";
   const isGroupedPositions = selectionMode === "grouped-positions";
   const isOrderedCombination = selectionMode === "ordered-combination";
-  const isMultiRace = selectionMode === "multi-race";
+  const isGroupedRaces = selectionMode === "grouped-races";
 
-  // 🔥 Verificar si un caballo está habilitado
-  const isHorseEnabled = (horse) => {
+  // 🔥 Cargar carreras siguientes
+  useEffect(() => {
+    if (!isGroupedRaces || !race) return;
+
+    const loadNextRaces = async () => {
+      setLoadingNextRaces(true);
+      try {
+        const numRaces = betTypeConfig?.races || 2;
+        const currentRaceNum = parseInt(race.raceNumber || race.num_carrera);
+        const venue = race.venue || race.descripcion_hipodromo;
+        const fecha = race.date || race.fecha_texto;
+
+        console.log("📥 Cargando " + (numRaces - 1) + " carreras siguientes...");
+        console.log("📍 Carrera actual: " + currentRaceNum + " (tipo: " + typeof currentRaceNum + ") en " + venue);
+        console.log("📍 Fecha: " + fecha);
+
+        const racesToLoad = [];
+
+        for (let i = 1; i < numRaces; i++) {
+          const nextRaceNum = currentRaceNum + i;
+          const nextRaceNumStr = String(nextRaceNum);
+
+          console.log("🔍 Buscando carrera siguiente...");
+          console.log("   Carrera actual: " + currentRaceNum);
+          console.log("   i: " + i);
+          console.log("   nextRaceNum calculado: " + nextRaceNum + " → String: \"" + nextRaceNumStr + "\"");
+          console.log("   Venue: \"" + venue + "\"");
+          console.log("   Fecha: \"" + fecha + "\"");
+
+          const q = query(
+            collection(db, "carreras1"),
+            where("num_carrera", "==", nextRaceNumStr),
+            where("descripcion_hipodromo", "==", venue),
+            where("fecha_texto", "==", fecha),
+            limit(1)
+          );
+
+          const snapshot = await getDocs(q);
+          
+          console.log("   Resultados encontrados: " + snapshot.size);
+          
+          if (snapshot.empty) {
+            console.log("   ❌ NO ENCONTRADA con los filtros exactos");
+            console.log("   🔍 Buscando TODAS las carreras de \"" + venue + "\" el \"" + fecha + "\"...");
+            
+            const debugQuery = query(
+              collection(db, "carreras1"),
+              where("descripcion_hipodromo", "==", venue),
+              where("fecha_texto", "==", fecha)
+            );
+            const debugSnapshot = await getDocs(debugQuery);
+            console.log("   📋 Total carreras encontradas: " + debugSnapshot.size);
+            
+            debugSnapshot.forEach(doc => {
+              const data = doc.data();
+              console.log("      → Carrera num_carrera=\"" + data.num_carrera + "\" (tipo: " + typeof data.num_carrera + ")");
+            });
+          }
+          
+          if (!snapshot.empty) {
+            const raceData = snapshot.docs[0].data();
+            console.log("   ✅ Encontrada carrera " + nextRaceNumStr);
+            console.log("   📦 Datos de la carrera:", raceData);
+            
+            const horsesArray = [];
+            
+            // 🔥 OPCIÓN 1: Intentar obtener de limitesApuestas (si existe info detallada)
+            if (raceData.limitesApuestas) {
+              console.log("   🐴 Extrayendo desde 'limitesApuestas'");
+              Object.entries(raceData.limitesApuestas).forEach(([betType, betData]) => {
+                if (betData.caballos) {
+                  Object.entries(betData.caballos).forEach(([key, horseData]) => {
+                    if (key.startsWith('caballo_')) {
+                      const horseNum = parseInt(key.replace('caballo_', ''));
+                      if (!horsesArray.some(h => h.number === horseNum)) {
+                        horsesArray.push({
+                          number: horseNum,
+                          name: horseData.nombre || `Caballo ${horseNum}`,
+                          jockey: horseData.jockey || ''
+                        });
+                      }
+                    }
+                  });
+                }
+              });
+            }
+            
+            // 🔥 OPCIÓN 2: Si no hay info detallada, usar caballitos (solo números)
+            if (horsesArray.length === 0 && raceData.caballitos) {
+              console.log("   🐴 Extrayendo desde 'caballitos' (solo números)");
+              Object.entries(raceData.caballitos).forEach(([key, value]) => {
+                if (key.startsWith('caballo_') && value === true) {
+                  const horseNum = parseInt(key.replace('caballo_', ''));
+                  horsesArray.push({
+                    number: horseNum,
+                    name: `Caballo ${horseNum}`,
+                    jockey: ''
+                  });
+                }
+              });
+            }
+
+            console.log("   ✅ Total caballos extraídos: " + horsesArray.length);
+            console.log("   📋 Caballos:", horsesArray);
+            horsesArray.sort((a, b) => a.number - b.number);
+
+            racesToLoad.push({
+              ...raceData,
+              id: snapshot.docs[0].id,
+              horses: horsesArray,
+              raceNumber: raceData.num_carrera
+            });
+          } else {
+            console.warn("   ⚠️ No se encontró la carrera " + nextRaceNumStr);
+          }
+        }
+
+        if (racesToLoad.length === numRaces - 1) {
+          setNextRaces(racesToLoad);
+          console.log("✅ Todas las carreras siguientes cargadas:", racesToLoad);
+        } else {
+          setNextRaces([]);
+          console.warn("❌ No se pudieron cargar todas las " + (numRaces - 1) + " carreras necesarias");
+        }
+        
+      } catch (error) {
+        console.error("❌ Error cargando carreras siguientes:", error);
+        alert("Error al cargar las carreras siguientes. Por favor, intentá de nuevo.");
+      } finally {
+        setLoadingNextRaces(false);
+      }
+    };
+
+    loadNextRaces();
+  }, [isGroupedRaces, race, betTypeConfig]);
+
+  const isHorseEnabled = (horse, raceToCheck = race) => {
     const key = `caballo_${horse.number}`;
-    return race?.caballitos?.[key] === true;
+    return raceToCheck?.caballitos?.[key] === true;
   };
 
-  // 🔥 NUEVO: Función auxiliar para calcular factorial
   const factorial = (n) => {
     if (n <= 1) return 1;
     let result = 1;
@@ -71,7 +218,6 @@ const HorseSelector = ({
     return result;
   };
 
-  // 🔥 NUEVO: Calcular combinaciones con grupos por posición
   const calculateGroupedCombinations = (tempGroupedPositions) => {
     const positions = betTypeConfig?.positions || 2;
     let total = 1;
@@ -85,7 +231,19 @@ const HorseSelector = ({
     return total;
   };
 
-  // 🔥 NUEVO: Validar tope de combinaciones
+  const calculateGroupedRacesCombinations = (tempGroupedRaces) => {
+    const numRaces = betTypeConfig?.races || 2;
+    let total = 1;
+
+    for (let i = 1; i <= numRaces; i++) {
+      const count = tempGroupedRaces[`race${i}`]?.length || 0;
+      if (count === 0) return 0;
+      total *= count;
+    }
+
+    return total;
+  };
+
   const validateCombinationLimit = (newCombinations) => {
     const betTypeKey = betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
     const limites = race?.limitesApuestas?.[betTypeKey];
@@ -96,21 +254,82 @@ const HorseSelector = ({
     return newCombinations <= topeCombinaciones;
   };
 
-  // 🎯 Toggle caballo según el tipo de apuesta
   const toggleHorse = (horse) => {
-    if (!isHorseEnabled(horse)) {
-      console.log(`⛔ Caballo ${horse.number} no corre`);
+    if (isGroupedRaces) {
+      const raceToCheck = currentRace === 1 ? race : nextRaces[currentRace - 2];
+      if (!isHorseEnabled(horse, raceToCheck)) {
+        console.log(`⛔ Caballo ${horse.number} no corre en esta carrera`);
+        return;
+      }
+    } else {
+      if (!isHorseEnabled(horse)) {
+        console.log(`⛔ Caballo ${horse.number} no corre`);
+        return;
+      }
+    }
+
+    if (isGroupedRaces) {
+      const raceKey = `race${currentRace}`;
+      const currentGroup = groupedRaces[raceKey] || [];
+      const isInCurrentGroup = currentGroup.some(
+        (h) => h.number === horse.number
+      );
+
+      if (isInCurrentGroup) {
+        const newGroup = currentGroup.filter((h) => h.number !== horse.number);
+        setGroupedRaces({
+          ...groupedRaces,
+          [raceKey]: newGroup,
+        });
+        console.log(
+          `❌ Caballo #${horse.number} removido de carrera ${currentRace}`
+        );
+      } else {
+        if (currentGroup.length >= betTypeConfig.maxHorses) {
+          alert(
+            `⚠️ Solo puedes seleccionar hasta ${betTypeConfig.maxHorses} caballos por carrera`
+          );
+          return;
+        }
+
+        const tempGroupedRaces = {
+          ...groupedRaces,
+          [raceKey]: [...currentGroup, horse],
+        };
+
+        const newCombinations =
+          calculateGroupedRacesCombinations(tempGroupedRaces);
+
+        if (!validateCombinationLimit(newCombinations)) {
+          const betTypeKey =
+            betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
+          const limites = race?.limitesApuestas?.[betTypeKey];
+          const topeCombinaciones = limites?.topedeconbinaciones;
+
+          alert(
+            `🚫 No puedes agregar este caballo.\n\n` +
+              `Se superaría el límite de ${topeCombinaciones} combinaciones permitidas.\n` +
+              `Combinaciones actuales: ${calculateGroupedRacesCombinations(
+                groupedRaces
+              )}\n` +
+              `Si agregas este caballo: ${newCombinations} combinaciones`
+          );
+          return;
+        }
+
+        setGroupedRaces(tempGroupedRaces);
+        console.log(
+          `✅ Caballo #${horse.number} agregado a carrera ${currentRace} (${newCombinations} combinaciones)`
+        );
+      }
       return;
     }
 
-    // 🔥 Para apuestas con GRUPOS POR POSICIÓN (EXACTA, IMPERFECTA, TRIFECTA D, CUATRIFECTA D)
     if (isGroupedPositions) {
       const positionKey = `position${currentPosition}`;
       const currentGroup = groupedPositions[positionKey] || [];
       const group1Count = groupedPositions.position1?.length || 0;
-      const totalPositions = betTypeConfig?.positions || 2;
 
-      // Restricción de "no repetir" si group1 tiene exactamente 1 caballo
       if (group1Count === 1) {
         const otherPositions = Object.keys(groupedPositions).filter(
           (key) => key !== positionKey
@@ -151,7 +370,6 @@ const HorseSelector = ({
           return;
         }
 
-        // 🔥 NUEVO: Validar tope de combinaciones ANTES de agregar
         const tempGroupedPositions = {
           ...groupedPositions,
           [positionKey]: [...currentGroup, horse],
@@ -185,7 +403,6 @@ const HorseSelector = ({
       return;
     }
 
-    // 🔥 Para apuestas DIRECTAS (TRIFECTA D, CUATRIFECTA D)
     if (isOrderedDirect) {
       const newSelection = [...selectedHorses];
       const positionIndex = currentPosition - 1;
@@ -202,7 +419,6 @@ const HorseSelector = ({
       return;
     }
 
-    // 🔥 Para apuestas SIMPLES (GANADOR, SEGUNDO, TERCERO, TIRA)
     if (isSimple || betTypeConfig?.type === "tira") {
       if (selectedHorses.some((h) => h.number === horse.number)) {
         onSelect([]);
@@ -214,8 +430,7 @@ const HorseSelector = ({
       return;
     }
 
-    // 🔥 Para apuestas COMBINADAS (TRIFECTA C, CUATRIFECTA C) y MULTI-RACE
-    if (isOrderedCombination || isMultiRace) {
+    if (isOrderedCombination) {
       const isSelected = selectedHorses.some((h) => h.number === horse.number);
 
       if (isSelected) {
@@ -234,18 +449,14 @@ const HorseSelector = ({
 
         const newSelection = [...selectedHorses, horse];
 
-        // 🔥 NUEVO: Calcular combinaciones y validar tope
         let newCombinations = 1;
         const n = newSelection.length;
 
         if (isOrderedCombination) {
           const positions = betTypeConfig?.positions || 3;
           if (n >= positions) {
-            // Permutaciones: P(n,r) = n! / (n-r)!
             newCombinations = factorial(n) / factorial(n - positions);
           }
-        } else if (isMultiRace) {
-          newCombinations = Math.pow(n, betTypeConfig?.races || 1);
         }
 
         if (!validateCombinationLimit(newCombinations)) {
@@ -270,7 +481,6 @@ const HorseSelector = ({
       return;
     }
 
-    // 🔥 FALLBACK
     const isSelected = selectedHorses.some((h) => h.number === horse.number);
 
     if (isSelected) {
@@ -290,16 +500,19 @@ const HorseSelector = ({
     }
   };
 
-  // 🎯 Calcular combinaciones
   const calculateCombinations = () => {
-    // Para grupos por posición (EXACTA, IMPERFECTA, TRIFECTA D, CUATRIFECTA D)
+    if (isGroupedRaces) {
+      return calculateGroupedRacesCombinations(groupedRaces);
+    }
+
     if (isGroupedPositions) {
       return calculateGroupedCombinations(groupedPositions);
     }
 
-    // Asegurar que selectedHorses sea un array
-    const horsesArray = Array.isArray(selectedHorses) ? selectedHorses : [];
-    const n = horsesArray.length;
+    const horseArrayLength = Array.isArray(selectedHorses)
+      ? selectedHorses.length
+      : 0;
+    const n = horseArrayLength;
 
     if (n === 0) return 0;
     if (isSimple) return 1;
@@ -312,16 +525,11 @@ const HorseSelector = ({
       return factorial(n) / factorial(n - positions);
     }
 
-    if (isMultiRace) {
-      return Math.pow(n, betTypeConfig?.races || 1);
-    }
-
     return 1;
   };
 
   const combinaciones = calculateCombinations();
 
-  // 🔥 NUEVO: Obtener información del tope de combinaciones
   const getCombinationLimitInfo = () => {
     const betTypeKey = betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
     const limites = race?.limitesApuestas?.[betTypeKey];
@@ -344,11 +552,33 @@ const HorseSelector = ({
 
   const limitInfo = getCombinationLimitInfo();
 
-  // 🎯 Texto de instrucciones según el tipo de apuesta
   const getInstructions = () => {
     if (isSimple) return "Selecciona 1 caballo";
     if (betTypeConfig?.type === "tira")
       return "Selecciona 1 caballo (se jugará automáticamente a ganador, segundo Y tercero = 3 apuestas)";
+
+    if (isGroupedRaces) {
+      const racesText =
+        betTypeConfig?.races === 2
+          ? "2 carreras"
+          : betTypeConfig?.races === 3
+          ? "3 carreras"
+          : betTypeConfig?.races === 4
+          ? "4 carreras"
+          : betTypeConfig?.races === 5
+          ? "5 carreras"
+          : `${betTypeConfig?.races || 0} carreras`;
+
+      const currentRaceNum = parseInt(race.raceNumber || race.num_carrera);
+      const raceNumbers = Array.from(
+        { length: betTypeConfig?.races },
+        (_, i) => currentRaceNum + i
+      );
+
+      return `Selecciona de 1 a ${
+        betTypeConfig?.maxHorses || 10
+      } caballos ganadores para ${racesText} consecutivas (Carreras ${raceNumbers.join(", ")}). Se generan combinaciones: ${raceNumbers.map((r, i) => `C${i + 1}`).join(" × ")}`;
+    }
 
     if (isGroupedPositions) {
       const positions = betTypeConfig?.positions || 2;
@@ -377,28 +607,48 @@ const HorseSelector = ({
       return `Selecciona ${positions} o más caballos. Se generarán todas las combinaciones EN ORDEN para los ${positionsText}`;
     }
 
-    if (isMultiRace) {
-      const racesText =
-        betTypeConfig?.races === 2
-          ? "2 carreras"
-          : betTypeConfig?.races === 3
-          ? "3 carreras"
-          : betTypeConfig?.races === 4
-          ? "4 carreras"
-          : betTypeConfig?.races === 5
-          ? "5 carreras"
-          : `${betTypeConfig?.races || 0} carreras`;
-      return `Selecciona de 1 a ${
-        betTypeConfig?.maxHorses || 10
-      } caballos ganadores para ${racesText} consecutivas`;
-    }
-
     return `Selecciona de ${betTypeConfig?.minHorses || 1} a ${
       betTypeConfig?.maxHorses || 10
     } caballos`;
   };
 
   const handleNext = () => {
+    if (isGroupedRaces) {
+      const numRaces = betTypeConfig?.races || 2;
+      const groups = {};
+
+      for (let i = 1; i <= numRaces; i++) {
+        const group = groupedRaces[`race${i}`] || [];
+        if (group.length === 0) {
+          const raceNum = i === 1 
+            ? parseInt(race.raceNumber || race.num_carrera)
+            : parseInt(race.raceNumber || race.num_carrera) + (i - 1);
+          
+          alert(
+            `⚠️ Debes seleccionar al menos 1 caballo en la Carrera ${raceNum}`
+          );
+          return;
+        }
+        groups[`race${i}`] = group;
+      }
+
+      const totalCombinations = calculateGroupedRacesCombinations(groupedRaces);
+      if (!validateCombinationLimit(totalCombinations)) {
+        const betTypeKey = betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
+        const limites = race?.limitesApuestas?.[betTypeKey];
+        const topeCombinaciones = limites?.topedeconbinaciones;
+
+        alert(
+          `🚫 No puedes continuar.\n\nSuperaste el límite de ${topeCombinaciones} combinaciones.\nActualmente tienes: ${totalCombinations} combinaciones`
+        );
+        return;
+      }
+
+      console.log("➡️ Continuando con grupos de carreras:", groups);
+      onNext({ grouped: true, multiRace: true, ...groups });
+      return;
+    }
+
     if (isGroupedPositions) {
       const positions = betTypeConfig?.positions || 2;
       const groups = {};
@@ -412,7 +662,6 @@ const HorseSelector = ({
         groups[`position${i}`] = group;
       }
 
-      // 🔥 NUEVO: Validar tope antes de continuar
       const totalCombinations = calculateGroupedCombinations(groupedPositions);
       if (!validateCombinationLimit(totalCombinations)) {
         const betTypeKey = betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
@@ -452,15 +701,24 @@ const HorseSelector = ({
     }
   };
 
-  // 🎯 Función para validar si se puede continuar
   const canProceed = () => {
+    if (isGroupedRaces) {
+      const numRaces = betTypeConfig?.races || 2;
+      for (let i = 1; i <= numRaces; i++) {
+        const count = groupedRaces[`race${i}`]?.length || 0;
+        if (count < 1) return false;
+      }
+      const totalCombinations = calculateGroupedRacesCombinations(groupedRaces);
+      if (!validateCombinationLimit(totalCombinations)) return false;
+      return true;
+    }
+
     if (isGroupedPositions) {
       const positions = betTypeConfig?.positions || 2;
       for (let i = 1; i <= positions; i++) {
         const count = groupedPositions[`position${i}`]?.length || 0;
         if (count < 1) return false;
       }
-      // 🔥 NUEVO: Validar que no supere el tope
       const totalCombinations = calculateGroupedCombinations(groupedPositions);
       if (!validateCombinationLimit(totalCombinations)) return false;
       return true;
@@ -479,9 +737,33 @@ const HorseSelector = ({
     setCurrentPosition(position);
   };
 
+  const changeRace = (raceNum) => {
+    setCurrentRace(raceNum);
+  };
+
+  if (isGroupedRaces && !loadingNextRaces && nextRaces.length < (betTypeConfig?.races || 2) - 1) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <AlertCircle className="w-16 h-16 text-amber-500 mb-4" />
+        <p className="text-slate-300 text-center font-semibold mb-2">
+          No se pueden realizar apuestas de tipo {betTypeConfig?.label}
+        </p>
+        <p className="text-slate-400 text-center text-sm max-w-md">
+          Para apostar {betTypeConfig?.label}, se necesitan {betTypeConfig?.races} carreras consecutivas, 
+          pero solo hay {nextRaces.length + 1} carrera(s) disponible(s) en este hipódromo para esta fecha.
+        </p>
+        <button
+          onClick={onBack}
+          className="mt-6 flex items-center justify-center gap-2 px-6 py-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-white font-semibold rounded-xl transition-all">
+          <ChevronLeft className="w-5 h-5" />
+          Volver a tipos de apuesta
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {/* Información de selección */}
       <div className="bg-gradient-to-r from-fuchsia-500/20 to-slate-800/40 border border-fuchsia-500/30 rounded-xl p-4">
         <div className="flex items-center justify-between mb-2">
           <span className="text-fuchsia-300 font-semibold flex items-center gap-2">
@@ -495,6 +777,15 @@ const HorseSelector = ({
                   const counts = [];
                   for (let i = 1; i <= positions; i++) {
                     counts.push(groupedPositions[`position${i}`]?.length || 0);
+                  }
+                  return counts.join("+");
+                })()
+              : isGroupedRaces
+              ? (() => {
+                  const numRaces = betTypeConfig?.races || 2;
+                  const counts = [];
+                  for (let i = 1; i <= numRaces; i++) {
+                    counts.push(groupedRaces[`race${i}`]?.length || 0);
                   }
                   return counts.join("+");
                 })()
@@ -512,7 +803,75 @@ const HorseSelector = ({
           </p>
         )}
 
-        {/* SELECTOR DE POSICIONES para apuestas con grupos */}
+        {isGroupedRaces && (
+          <div className="mt-3 pt-3 border-t border-fuchsia-500/20">
+            <p className="text-slate-400 text-xs mb-2">
+              Seleccionando caballos para:
+            </p>
+
+            {loadingNextRaces ? (
+              <div className="flex items-center gap-2 text-slate-400 text-sm">
+                <div className="w-4 h-4 border-2 border-fuchsia-500/30 border-t-fuchsia-500 rounded-full animate-spin"></div>
+                <span>Cargando carreras siguientes...</span>
+              </div>
+            ) : (
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => changeRace(1)}
+                  className={`px-3 py-2 rounded-lg font-semibold transition-all ${
+                    currentRace === 1
+                      ? "bg-fuchsia-500 text-white shadow-lg"
+                      : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/50"
+                  }`}>
+                  Carrera {race.raceNumber || race.num_carrera}
+                  {groupedRaces.race1?.length > 0 && (
+                    <span className="ml-2 text-xs">
+                      ({groupedRaces.race1.length})
+                    </span>
+                  )}
+                </button>
+
+                {nextRaces.map((nextRace, index) => {
+                  const raceNum = index + 2;
+                  const count = groupedRaces[`race${raceNum}`]?.length || 0;
+
+                  return (
+                    <button
+                      key={raceNum}
+                      onClick={() => changeRace(raceNum)}
+                      className={`px-3 py-2 rounded-lg font-semibold transition-all ${
+                        currentRace === raceNum
+                          ? "bg-fuchsia-500 text-white shadow-lg"
+                          : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/50"
+                      }`}>
+                      Carrera {nextRace.raceNumber || nextRace.num_carrera}
+                      {count > 0 && (
+                        <span className="ml-2 text-xs">({count})</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {currentRace === 1 ? (
+              <div className="mt-2 text-xs text-slate-400">
+                📍 {race.venue || race.descripcion_hipodromo} -{" "}
+                {race.date || race.fecha_texto} {race.time || race.hora}
+              </div>
+            ) : nextRaces[currentRace - 2] ? (
+              <div className="mt-2 text-xs text-slate-400">
+                📍 {nextRaces[currentRace - 2]?.descripcion_hipodromo} - Carrera{" "}
+                {nextRaces[currentRace - 2]?.num_carrera}
+                <div className="mt-1">
+                  {nextRaces[currentRace - 2]?.fecha_texto}{" "}
+                  {nextRaces[currentRace - 2]?.hora}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
         {isGroupedPositions && (
           <div className="mt-3 pt-3 border-t border-fuchsia-500/20">
             <p className="text-slate-400 text-xs mb-2">
@@ -543,7 +902,6 @@ const HorseSelector = ({
           </div>
         )}
 
-        {/* SELECTOR DE POSICIONES para apuestas directas */}
         {isOrderedDirect && betTypeConfig?.positions && (
           <div className="mt-3 pt-3 border-t border-fuchsia-500/20">
             <p className="text-slate-400 text-xs mb-2">
@@ -575,9 +933,10 @@ const HorseSelector = ({
           </div>
         )}
 
-        {/* Mostrar combinaciones generadas */}
         {((isGroupedPositions && combinaciones > 0) ||
+          (isGroupedRaces && combinaciones > 0) ||
           (!isGroupedPositions &&
+            !isGroupedRaces &&
             selectedHorses.length >= betTypeConfig.minHorses &&
             combinaciones > 0)) && (
           <div className="mt-3 pt-3 border-t border-fuchsia-500/20">
@@ -602,7 +961,6 @@ const HorseSelector = ({
                 </span>
               </div>
 
-              {/* 🔥 NUEVO: Mostrar información del tope de combinaciones */}
               {limitInfo && (
                 <div
                   className={`pt-2 border-t border-slate-700/50 text-xs ${
@@ -666,6 +1024,27 @@ const HorseSelector = ({
                 </p>
               )}
 
+              {isGroupedRaces && combinaciones > 0 && (
+                <p className="text-xs text-slate-400 mt-2">
+                  💡{" "}
+                  {(() => {
+                    const numRaces = betTypeConfig?.races || 2;
+                    const parts = [];
+                    const currentRaceNum = parseInt(race.raceNumber || race.num_carrera);
+                    
+                    for (let i = 1; i <= numRaces; i++) {
+                      const raceNum = currentRaceNum + (i - 1);
+                      parts.push(
+                        `${groupedRaces[`race${i}`]?.length || 0} (C${raceNum})`
+                      );
+                    }
+                    return (
+                      parts.join(" × ") + ` = ${combinaciones} combinaciones`
+                    );
+                  })()}
+                </p>
+              )}
+
               {isOrderedCombination &&
                 (() => {
                   const horsesArray = Array.isArray(selectedHorses)
@@ -700,32 +1079,12 @@ const HorseSelector = ({
                       : ""}
                   </p>
                 )}
-
-              {isMultiRace &&
-                (() => {
-                  const horsesArray = Array.isArray(selectedHorses)
-                    ? selectedHorses
-                    : [];
-                  return horsesArray.length >= 1;
-                })() && (
-                  <p className="text-xs text-slate-400 mt-2">
-                    💡 Con{" "}
-                    {Array.isArray(selectedHorses) ? selectedHorses.length : 0}{" "}
-                    {(Array.isArray(selectedHorses)
-                      ? selectedHorses.length
-                      : 0) === 1
-                      ? "caballo"
-                      : "caballos"}
-                    , tienes {combinaciones}{" "}
-                    {combinaciones === 1 ? "combinación" : "combinaciones"} para
-                    las {betTypeConfig?.races || 0} carreras
-                  </p>
-                )}
             </div>
           </div>
         )}
 
         {!isGroupedPositions &&
+          !isGroupedRaces &&
           (() => {
             const horsesArray = Array.isArray(selectedHorses)
               ? selectedHorses
@@ -749,147 +1108,195 @@ const HorseSelector = ({
           )}
       </div>
 
-      {/* Lista de caballos */}
       <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-        {horses.map((horse) => {
-          const isEnabled = isHorseEnabled(horse);
+        {(() => {
+          const horsesToShow =
+            isGroupedRaces && currentRace > 1
+              ? nextRaces[currentRace - 2]?.horses || []
+              : horses;
 
-          let isSelected = false;
-          let selectedInPosition = null;
+          if (horsesToShow.length === 0) {
+            return (
+              <div className="flex flex-col items-center justify-center py-8">
+                <AlertCircle className="w-12 h-12 text-slate-600 mb-3" />
+                <p className="text-slate-400 text-center text-sm">
+                  No hay caballos disponibles para esta carrera
+                </p>
+              </div>
+            );
+          }
 
-          if (isGroupedPositions) {
-            const positions = betTypeConfig?.positions || 2;
-            for (let i = 1; i <= positions; i++) {
-              if (
-                groupedPositions[`position${i}`]?.some(
+          return horsesToShow.map((horse) => {
+            const raceToCheck = isGroupedRaces && currentRace > 1 
+              ? nextRaces[currentRace - 2] 
+              : race;
+            
+            const isEnabled = isHorseEnabled(horse, raceToCheck);
+
+            let isSelected = false;
+            let selectedInPosition = null;
+            let selectedInRace = null;
+
+            if (isGroupedRaces) {
+              const raceKey = `race${currentRace}`;
+              isSelected =
+                groupedRaces[raceKey]?.some(
                   (h) => h.number === horse.number
-                )
-              ) {
-                isSelected = true;
-                selectedInPosition = i;
-                break;
+                ) || false;
+              if (isSelected) selectedInRace = currentRace;
+            } else if (isGroupedPositions) {
+              const positions = betTypeConfig?.positions || 2;
+              for (let i = 1; i <= positions; i++) {
+                if (
+                  groupedPositions[`position${i}`]?.some(
+                    (h) => h.number === horse.number
+                  )
+                ) {
+                  isSelected = true;
+                  selectedInPosition = i;
+                  break;
+                }
               }
+            } else {
+              const horsesArray = Array.isArray(selectedHorses)
+                ? selectedHorses
+                : [];
+
+              const isSelectedInCurrentPosition =
+                isOrderedDirect &&
+                horsesArray[currentPosition - 1]?.number === horse.number;
+
+              isSelected = isOrderedDirect
+                ? isSelectedInCurrentPosition
+                : horsesArray.some((h) => h.number === horse.number);
             }
-          } else {
+
             const horsesArray = Array.isArray(selectedHorses)
               ? selectedHorses
               : [];
+            const selectionIndex = horsesArray.findIndex(
+              (h) => h.number === horse.number
+            );
 
-            const isSelectedInCurrentPosition =
-              isOrderedDirect &&
-              horsesArray[currentPosition - 1]?.number === horse.number;
+            const horsesArrayForLimit = Array.isArray(selectedHorses)
+              ? selectedHorses
+              : [];
+            const reachedLimit =
+              !isOrderedDirect &&
+              !isGroupedPositions &&
+              !isGroupedRaces &&
+              !isSelected &&
+              horsesArrayForLimit.length >= betTypeConfig.maxHorses;
 
-            isSelected = isOrderedDirect
-              ? isSelectedInCurrentPosition
-              : horsesArray.some((h) => h.number === horse.number);
-          }
-
-          const horsesArray = Array.isArray(selectedHorses)
-            ? selectedHorses
-            : [];
-          const selectionIndex = horsesArray.findIndex(
-            (h) => h.number === horse.number
-          );
-
-          const horsesArrayForLimit = Array.isArray(selectedHorses)
-            ? selectedHorses
-            : [];
-          const reachedLimit =
-            !isOrderedDirect &&
-            !isGroupedPositions &&
-            !isSelected &&
-            horsesArrayForLimit.length >= betTypeConfig.maxHorses;
-
-          return (
-            <button
-              key={horse.number}
-              onClick={() => toggleHorse(horse)}
-              disabled={!isEnabled || reachedLimit}
-              className={`group w-full text-left p-4 rounded-xl transition-all duration-300 ${
-                !isEnabled
-                  ? "bg-slate-800/20 border border-red-900/30 opacity-60 cursor-not-allowed"
-                  : isSelected
-                  ? "bg-gradient-to-br from-fuchsia-500/25 via-fuchsia-600/20 to-slate-800/40 border-2 border-fuchsia-400/60 shadow-lg shadow-fuchsia-500/20"
-                  : reachedLimit
-                  ? "bg-slate-800/20 border border-slate-700/30 opacity-50 cursor-not-allowed"
-                  : "bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 hover:border-fuchsia-500/50 hover:shadow-lg hover:shadow-fuchsia-500/10"
-              }`}>
-              <div className="flex items-center gap-4">
-                <div
-                  className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg transition-all ${
-                    !isEnabled
-                      ? "bg-slate-700/30 text-slate-600 border border-slate-700/50"
-                      : isSelected
-                      ? "bg-gradient-to-br from-fuchsia-500 to-fuchsia-600 text-white shadow-lg shadow-fuchsia-500/30"
-                      : "bg-slate-800/50 text-slate-400 border border-slate-700/50 group-hover:border-fuchsia-500/50"
-                  }`}>
-                  {horse.number}
-                </div>
-
-                <div className="flex-1">
-                  <h3
-                    className={`font-bold text-lg transition-colors ${
+            return (
+              <button
+                key={horse.number}
+                onClick={() => toggleHorse(horse)}
+                disabled={!isEnabled || reachedLimit}
+                className={`group w-full text-left p-4 rounded-xl transition-all duration-300 ${
+                  !isEnabled
+                    ? "bg-slate-800/20 border border-red-900/30 opacity-60 cursor-not-allowed"
+                    : isSelected
+                    ? "bg-gradient-to-br from-fuchsia-500/25 via-fuchsia-600/20 to-slate-800/40 border-2 border-fuchsia-400/60 shadow-lg shadow-fuchsia-500/20"
+                    : reachedLimit
+                    ? "bg-slate-800/20 border border-slate-700/30 opacity-50 cursor-not-allowed"
+                    : "bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 hover:border-fuchsia-500/50 hover:shadow-lg hover:shadow-fuchsia-500/10"
+                }`}>
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg transition-all ${
                       !isEnabled
-                        ? "text-slate-600"
+                        ? "bg-slate-700/30 text-slate-600 border border-slate-700/50"
                         : isSelected
-                        ? "text-fuchsia-300"
-                        : "text-slate-300 group-hover:text-white"
+                        ? "bg-gradient-to-br from-fuchsia-500 to-fuchsia-600 text-white shadow-lg shadow-fuchsia-500/30"
+                        : "bg-slate-800/50 text-slate-400 border border-slate-700/50 group-hover:border-fuchsia-500/50"
                     }`}>
-                    {horse.name}
-                  </h3>
-                  {!isEnabled && (
-                    <span className="inline-block mt-1 px-2 py-0.5 bg-red-900/30 border border-red-800/50 rounded text-red-400 text-xs font-bold">
-                      🚫 NO CORRE
-                    </span>
+                    {horse.number}
+                  </div>
+
+                  <div className="flex-1">
+                    <h3
+                      className={`font-bold text-lg transition-colors ${
+                        !isEnabled
+                          ? "text-slate-600"
+                          : isSelected
+                          ? "text-fuchsia-300"
+                          : "text-slate-300 group-hover:text-white"
+                      }`}>
+                      {horse.name}
+                    </h3>
+                    {!isEnabled && (
+                      <span className="inline-block mt-1 px-2 py-0.5 bg-red-900/30 border border-red-800/50 rounded text-red-400 text-xs font-bold">
+                        🚫 NO CORRE
+                      </span>
+                    )}
+                    {horse.jockey && isEnabled && (
+                      <p className="text-slate-500 text-sm mt-1">
+                        {horse.jockey}
+                      </p>
+                    )}
+                  </div>
+
+                  {isSelected && isEnabled && (
+                    <div className="flex items-center gap-2">
+                      {isGroupedPositions && selectedInPosition && (
+                        <span className="px-3 py-1 bg-emerald-500 text-white rounded-lg text-sm font-bold">
+                          {selectedInPosition}° puesto
+                        </span>
+                      )}
+                      {isGroupedRaces && selectedInRace && (
+                        <span className="px-3 py-1 bg-emerald-500 text-white rounded-lg text-sm font-bold">
+                          Carrera {
+                            selectedInRace === 1 
+                              ? race.raceNumber || race.num_carrera
+                              : parseInt(race.raceNumber || race.num_carrera) + (selectedInRace - 1)
+                          }
+                        </span>
+                      )}
+                      {isOrderedDirect && (
+                        <span className="px-3 py-1 bg-fuchsia-500 text-white rounded-lg text-sm font-bold">
+                          {selectionIndex + 1}° puesto
+                        </span>
+                      )}
+                      {isOrderedCombination && (
+                        <span className="px-3 py-1 bg-amber-500 text-white rounded-lg text-sm font-bold">
+                          #{selectionIndex + 1}
+                        </span>
+                      )}
+                      <div className="w-6 h-6 rounded-full bg-fuchsia-500 flex items-center justify-center">
+                        <Check className="w-4 h-4 text-white" />
+                      </div>
+                    </div>
                   )}
-                  {horse.jockey && isEnabled && (
-                    <p className="text-slate-500 text-sm mt-1">
-                      {horse.jockey}
-                    </p>
+
+                  {isOrderedDirect && !isSelected && isEnabled && (
+                    <div className="px-3 py-1 bg-slate-700/50 text-slate-400 rounded-lg text-xs">
+                      Click para {currentPosition}°
+                    </div>
+                  )}
+
+                  {isGroupedPositions && !isSelected && isEnabled && (
+                    <div className="px-3 py-1 bg-slate-700/50 text-slate-400 rounded-lg text-xs">
+                      Para {currentPosition}° puesto
+                    </div>
+                  )}
+
+                  {isGroupedRaces && !isSelected && isEnabled && (
+                    <div className="px-3 py-1 bg-slate-700/50 text-slate-400 rounded-lg text-xs">
+                      Para C{
+                        currentRace === 1 
+                          ? race.raceNumber || race.num_carrera
+                          : parseInt(race.raceNumber || race.num_carrera) + (currentRace - 1)
+                      }
+                    </div>
                   )}
                 </div>
-
-                {isSelected && isEnabled && (
-                  <div className="flex items-center gap-2">
-                    {isGroupedPositions && selectedInPosition && (
-                      <span className="px-3 py-1 bg-emerald-500 text-white rounded-lg text-sm font-bold">
-                        {selectedInPosition}° puesto
-                      </span>
-                    )}
-                    {isOrderedDirect && (
-                      <span className="px-3 py-1 bg-fuchsia-500 text-white rounded-lg text-sm font-bold">
-                        {selectionIndex + 1}° puesto
-                      </span>
-                    )}
-                    {isOrderedCombination && (
-                      <span className="px-3 py-1 bg-amber-500 text-white rounded-lg text-sm font-bold">
-                        #{selectionIndex + 1}
-                      </span>
-                    )}
-                    <div className="w-6 h-6 rounded-full bg-fuchsia-500 flex items-center justify-center">
-                      <Check className="w-4 h-4 text-white" />
-                    </div>
-                  </div>
-                )}
-
-                {isOrderedDirect && !isSelected && isEnabled && (
-                  <div className="px-3 py-1 bg-slate-700/50 text-slate-400 rounded-lg text-xs">
-                    Click para {currentPosition}°
-                  </div>
-                )}
-
-                {isGroupedPositions && !isSelected && isEnabled && (
-                  <div className="px-3 py-1 bg-slate-700/50 text-slate-400 rounded-lg text-xs">
-                    Para {currentPosition}° puesto
-                  </div>
-                )}
-              </div>
-            </button>
-          );
-        })}
+              </button>
+            );
+          });
+        })()}
       </div>
 
-      {/* Botones de navegación */}
       <div className="flex gap-3 pt-2">
         <button
           onClick={onBack}
@@ -910,7 +1317,6 @@ const HorseSelector = ({
         </button>
       </div>
 
-      {/* Custom Scrollbar */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;

@@ -82,160 +82,157 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
   }, [race?.firebaseId]);
 
   // 🔥 Configuración CORRECTA de tipos de apuesta
-  useEffect(() => {
-    if (!currentRaceData || !currentRaceData.tiposApuestas) {
-      console.warn("⚠️ No hay tiposApuestas en la carrera");
-      setLoading(false);
-      return;
-    }
+ useEffect(() => {
+  if (!currentRaceData || !currentRaceData.tiposApuestas) {
+    console.warn("⚠️ No hay tiposApuestas en la carrera");
+    setLoading(false);
+    return;
+  }
 
     console.log("📊 Cargando tipos de apuesta desde Firestore");
 
     // ✅ Configuración correcta de cada tipo de apuesta
-    const betTypeConfig = {
-      GANADOR: {
-        maxHorses: 1,
-        minHorses: 1,
-        type: "simple",
-        selectionMode: "single",
-        description: "Selecciona 1 caballo ganador",
-        howItWorks: "El caballo debe llegar en 1° lugar",
-      },
-      SEGUNDO: {
-        maxHorses: 1,
-        minHorses: 1,
-        type: "simple",
-        selectionMode: "single",
-        description: "Selecciona 1 caballo a segundo",
-        howItWorks: "El caballo debe llegar en 2° lugar",
-      },
-      TERCERO: {
-        maxHorses: 1,
-        minHorses: 1,
-        type: "simple",
-        selectionMode: "single",
-        description: "Selecciona 1 caballo a tercero",
-        howItWorks: "El caballo debe llegar en 3° lugar",
-      },
+  const betTypeConfig = {
+    GANADOR: {
+      maxHorses: 1,
+      minHorses: 1,
+      type: "simple",
+      selectionMode: "single",
+      description: "Selecciona 1 caballo ganador",
+      howItWorks: "El caballo debe llegar en 1° lugar",
+    },
+    SEGUNDO: {
+      maxHorses: 1,
+      minHorses: 1,
+      type: "simple",
+      selectionMode: "single",
+      description: "Selecciona 1 caballo a segundo",
+      howItWorks: "El caballo debe llegar en 2° lugar",
+    },
+    TERCERO: {
+      maxHorses: 1,
+      minHorses: 1,
+      type: "simple",
+      selectionMode: "single",
+      description: "Selecciona 1 caballo a tercero",
+      howItWorks: "El caballo debe llegar en 3° lugar",
+    },
 
-      //
-      "TIRA(1,2,3)": {
-        maxHorses: 10,
-        minHorses: 3,
-        type: "combinada-ordenada",
-        positions: 3,
-        selectionMode: "ordered-combination",
-        description: "1 caballo para ganador, segundo Y tercero",
-        howItWorks:
-          "El caballo debe llegar en los 3 primeros puestos. Son 3 apuestas en 1.",
-      },
+    "TIRA(1,2,3)": {
+      maxHorses: 10,
+      minHorses: 3,
+      type: "combinada-ordenada",
+      positions: 3,
+      selectionMode: "ordered-combination",
+      description: "1 caballo para ganador, segundo Y tercero",
+      howItWorks:
+        "El caballo debe llegar en los 3 primeros puestos. Son 3 apuestas en 1.",
+    },
 
-      EXACTA: {
-        maxHorses: 10,
-        minHorses: 2,
-        type: "combinada-por-posicion",
-        positions: 2,
-        selectionMode: "grouped-positions",
-        description: "Varios caballos para 1° y varios para 2° (EN ORDEN)",
-        howItWorks:
-          "Selecciona caballos para 1° puesto y caballos para 2° puesto. Se generan todas las combinaciones (1° × 2°)",
-      },
-      IMPERFECTA: {
-        maxHorses: 10,
-        minHorses: 2,
-        type: "combinada-por-posicion",
-        positions: 2,
-        selectionMode: "grouped-positions",
-        description: "Varios caballos para 1° y varios para 2° (EN ORDEN)",
-        howItWorks:
-          "Igual que EXACTA. Selecciona grupos de caballos para 1° y 2° puesto",
-      },
-      "TRIFECTA D": {
-        maxHorses: 3,
-        minHorses: 3,
-        type: "combinada-por-posicion",
-        positions: 3,
-        selectionMode: "grouped-positions",
-        description: "1 caballo para 1°, 1 para 2°, 1 para 3° (EN ORDEN)",
-        howItWorks:
-          "Selecciona exactamente 3 caballos en orden. El 1° que elijas debe llegar 1°, el 2° debe llegar 2°, etc.",
-      },
-      "TRIFECTA C": {
-        maxHorses: 10,
-        minHorses: 3,
-        type: "combinada-ordenada",
-        positions: 3,
-        selectionMode: "ordered-combination",
-        description: "Varios caballos para los 3 primeros puestos (Combinada)",
-        howItWorks:
-          "Selecciona 3 o más caballos. Se generan todas las combinaciones posibles de 3 caballos en orden",
-      },
-      "CUATRIFECTA D": {
-        maxHorses: 4,
-        minHorses: 4,
-        type: "combinada-por-posicion",
-        positions: 4,
-        selectionMode: "grouped-positions",
-        description:
-          "1 caballo para 1°, 1 para 2°, 1 para 3°, 1 para 4° (EN ORDEN)",
-        howItWorks: "Selecciona exactamente 4 caballos en orden de llegada",
-      },
-      "CUATRIFECTA C": {
-        maxHorses: 10,
-        minHorses: 4,
-        type: "combinada-ordenada",
-        positions: 4,
-        selectionMode: "ordered-combination",
-        description: "Varios caballos para los 4 primeros puestos (Combinada)",
-        howItWorks:
-          "Selecciona 4 o más caballos. Se generan todas las permutaciones de 4 caballos",
-      },
+    EXACTA: {
+      maxHorses: 10,
+      minHorses: 2,
+      type: "combinada-por-posicion",
+      positions: 2,
+      selectionMode: "grouped-positions",
+      description: "Varios caballos para 1° y varios para 2° (EN ORDEN)",
+      howItWorks:
+        "Selecciona caballos para 1° puesto y caballos para 2° puesto. Se generan todas las combinaciones (1° × 2°)",
+    },
+    IMPERFECTA: {
+      maxHorses: 10,
+      minHorses: 2,
+      type: "combinada-por-posicion",
+      positions: 2,
+      selectionMode: "grouped-positions",
+      description: "Varios caballos para 1° y varios para 2° (EN ORDEN)",
+      howItWorks:
+        "Igual que EXACTA. Selecciona grupos de caballos para 1° y 2° puesto",
+    },
+    "TRIFECTA D": {
+      maxHorses: 3,
+      minHorses: 3,
+      type: "combinada-por-posicion",
+      positions: 3,
+      selectionMode: "grouped-positions",
+      description: "1 caballo para 1°, 1 para 2°, 1 para 3° (EN ORDEN)",
+      howItWorks:
+        "Selecciona exactamente 3 caballos en orden. El 1° que elijas debe llegar 1°, el 2° debe llegar 2°, etc.",
+    },
+    "TRIFECTA C": {
+      maxHorses: 10,
+      minHorses: 3,
+      type: "combinada-ordenada",
+      positions: 3,
+      selectionMode: "ordered-combination",
+      description: "Varios caballos para los 3 primeros puestos (Combinada)",
+      howItWorks:
+        "Selecciona 3 o más caballos. Se generan todas las combinaciones posibles de 3 caballos en orden",
+    },
+    "CUATRIFECTA D": {
+      maxHorses: 4,
+      minHorses: 4,
+      type: "combinada-por-posicion",
+      positions: 4,
+      selectionMode: "grouped-positions",
+      description:
+        "1 caballo para 1°, 1 para 2°, 1 para 3°, 1 para 4° (EN ORDEN)",
+      howItWorks: "Selecciona exactamente 4 caballos en orden de llegada",
+    },
+    "CUATRIFECTA C": {
+      maxHorses: 10,
+      minHorses: 4,
+      type: "combinada-ordenada",
+      positions: 4,
+      selectionMode: "ordered-combination",
+      description: "Varios caballos para los 4 primeros puestos (Combinada)",
+      howItWorks:
+        "Selecciona 4 o más caballos. Se generan todas las permutaciones de 4 caballos",
+    },
 
-      ///estos no van por posciion van por carrera variable race
-      DOBLE: {
-        maxHorses: 10,
-        minHorses: 1,
-        type: "combinada-por-posicion",
+    // 🔥 MULTI-CARRERA: DOBLE, TRIPLO, PICK 4, PICK 5
+    DOBLE: {
+      maxHorses: 10,
+      minHorses: 1,
+      type: "multi-race",
+      races: 2,
+      selectionMode: "grouped-races",
+      description: "Ganadores de 2 carreras consecutivas",
+      howItWorks:
+        "Selecciona caballos ganadores en esta carrera y la siguiente. Se generan todas las combinaciones (Carrera 1 × Carrera 2)",
+    },
+    TRIPLO: {
+      maxHorses: 10,
+      minHorses: 1,
+      type: "multi-race",
+      races: 3,
+      selectionMode: "grouped-races",
+      description: "Ganadores de 3 carreras consecutivas",
+      howItWorks:
+        "Selecciona caballos ganadores en 3 carreras consecutivas. Se generan todas las combinaciones (C1 × C2 × C3)",
+    },
+    "PICK 4": {
+      maxHorses: 10,
+      minHorses: 1,
+      type: "multi-race",
+      races: 4,
+      selectionMode: "grouped-races",
+      description: "Ganadores de 4 carreras consecutivas",
+      howItWorks:
+        "Selecciona caballos ganadores en 4 carreras consecutivas. Se generan todas las combinaciones (C1 × C2 × C3 × C4)",
+    },
+    "PICK 5": {
+      maxHorses: 10,
+      minHorses: 1,
+      type: "multi-race",
+      races: 5,
+      selectionMode: "grouped-races",
+      description: "Ganadores de 5 carreras consecutivas",
+      howItWorks:
+        "Selecciona caballos ganadores en 5 carreras consecutivas. Se generan todas las combinaciones (C1 × C2 × C3 × C4 × C5)",
+    },
+  };
 
-        //cambiar por carreras despues
-
-        race: 2,
-        positions: 2,
-        selectionMode: "grouped-positions",
-        description: "Ganadores de 2 carreras consecutivas",
-        howItWorks:
-          "Selecciona caballos ganadores en esta carrera y la siguiente",
-        // requiresNextRace: false,
-      },
-      TRIPLO: {
-        maxHorses: 10,
-        minHorses: 1,
-        type: "combinada-por-posicion",
-        positions: 3,
-        selectionMode: "grouped-positions",
-        description: "Ganadores de 3 carreras consecutivas",
-        // requiresNextRace: false,
-      },
-      "PICK 4": {
-        maxHorses: 10,
-        minHorses: 1,
-        type: "combinada-por-posicion",
-        positions: 4,
-        selectionMode: "grouped-positions",
-        description: "Ganadores de 4 carreras consecutivas",
-        // requiresNextRace: false,
-      },
-      "PICK 5": {
-        maxHorses: 10,
-        minHorses: 1,
-        type: "combinada-por-posicion",
-        positions: 5,
-        selectionMode: "grouped-positions",
-        description: "Ganadores de 5 carreras consecutivas",
-        // requiresNextRace: false,
-      },
-      ////////////////////////
-    };
 
     // Filtrar solo los tipos habilitados en Firestore
     const enabledTypesTemp = {};
