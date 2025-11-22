@@ -7,9 +7,10 @@ import {
   increment,
   getDocs,
   Timestamp,
-  onSnapshot, // 🔥 Para escuchar cambios en tiempo real
+  onSnapshot,
   query,
   orderBy,
+  setDoc,
 } from "firebase/firestore";
 
 // ✅ Función para limpiar valores undefined recursivamente
@@ -38,52 +39,262 @@ const cleanFirestoreData = (obj) => {
   return obj;
 };
 
-// ✅ Función helper para convertir fecha a Timestamp de forma segura
+// ✅ Función helper para convertir fecha STRING a Timestamp en zona horaria local
 const toFirestoreTimestamp = (dateValue) => {
   if (!dateValue) return Timestamp.now();
-
-  if (dateValue instanceof Timestamp) {
-    return dateValue;
-  }
-
-  const date = new Date(dateValue);
-
-  if (isNaN(date.getTime())) {
-    console.warn(
-      "⚠️ Fecha inválida recibida:",
-      dateValue,
-      "- usando fecha actual"
-    );
+  if (dateValue instanceof Timestamp) return dateValue;
+  
+  try {
+    let date;
+    
+    // Si viene como string de fecha "YYYY-MM-DD" (formato más común)
+    if (typeof dateValue === 'string') {
+      // Formato YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+        const [year, month, day] = dateValue.split('-').map(Number);
+        // 🔥 CREAR FECHA EN ZONA HORARIA LOCAL (mediodía para evitar cambios de día)
+        date = new Date(year, month - 1, day, 12, 0, 0, 0);
+        console.log(`📅 Fecha creada desde "${dateValue}":`, date.toLocaleDateString('es-AR'));
+      }
+      // Formato DD/MM/YYYY
+      else if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateValue)) {
+        const [day, month, year] = dateValue.split('/').map(Number);
+        date = new Date(year, month - 1, day, 12, 0, 0, 0);
+        console.log(`📅 Fecha creada desde "${dateValue}":`, date.toLocaleDateString('es-AR'));
+      }
+      // Otros formatos - parsear y ajustar a mediodía
+      else {
+        date = new Date(dateValue);
+        // Si es medianoche, cambiar a mediodía para evitar problemas de zona horaria
+        if (date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0) {
+          date.setHours(12, 0, 0, 0);
+        }
+      }
+    } 
+    // Si ya es un objeto Date
+    else if (dateValue instanceof Date) {
+      date = new Date(dateValue);
+      // Si es medianoche, cambiar a mediodía
+      if (date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0) {
+        date.setHours(12, 0, 0, 0);
+      }
+    } 
+    // Otros casos
+    else {
+      date = new Date(dateValue);
+    }
+    
+    // Validar que la fecha sea válida
+    if (isNaN(date.getTime())) {
+      console.warn("⚠️ Fecha inválida:", dateValue, "- usando fecha actual");
+      return Timestamp.now();
+    }
+    
+    console.log("✅ Timestamp creado:", {
+      entrada: dateValue,
+      fechaLocal: date.toLocaleDateString('es-AR'),
+      horaLocal: date.toLocaleTimeString('es-AR'),
+    });
+    
+    return Timestamp.fromDate(date);
+  } catch (error) {
+    console.warn("⚠️ Error al convertir fecha:", dateValue, error);
     return Timestamp.now();
   }
-
-  return Timestamp.fromDate(date);
 };
 
 const betService = {
-  // Calcular ganancia potencial
-  calculatePotentialWin: (betType, selectedHorses, amount) => {
-    const multipliers = {
-      GANADOR: 2.5,
-      SEGUNDO: 2.0,
-      TERCERO: 1.8,
-      EXACTA: 5.0,
-      TRIFECTA_D: 3.0,
-      TIRA_1_2: 4.0,
-      TIRA_1_2_3: 6.0,
-      TRIFECTA_C: 8.0,
-    };
+  // 🔥 CREAR APUESTA CON TODOS LOS DATOS
+  createBet: async (userId, betData, userSaldo) => {
+    try {
+      console.log("🎯 Iniciando creación de apuesta...");
+      console.log("📦 Datos recibidos:", betData);
 
-    const multiplier = multipliers[betType] || 2.0;
-    return Math.floor(amount * multiplier);
+      // ========== VALIDACIONES PREVIAS ==========
+      if (userSaldo < betData.montoTotal) {
+        throw new Error("Saldo insuficiente para realizar esta apuesta");
+      }
+
+      if (!betData.selectedHorses || betData.selectedHorses.length === 0) {
+        throw new Error("Debes seleccionar al menos un caballo");
+      }
+
+      // ========== PREPARAR INFORMACIÓN DE CABALLOS ==========
+      const caballosSeleccionados = betData.selectedHorses.map((horse) => ({
+        numero: Number(horse.numero || horse.number) || 0,
+        nombre: String(horse.nombre || horse.name || `Caballo ${horse.numero || horse.number}`),
+        jockey: String(horse.jockey || ""),
+        noCorre: Boolean(horse.noCorre || horse.scratched),
+      }));
+
+      // Generar texto descriptivo
+      const caballosTexto = caballosSeleccionados
+        .map((c) => `#${c.numero} ${c.nombre}`)
+        .join(", ");
+
+      console.log("✅ Caballos procesados:", caballosSeleccionados);
+
+      // ========== CONSTRUIR OBJETO COMPLETO PARA FIREBASE ==========
+      const apuestaData = {
+        // ========== INFORMACIÓN DEL HIPÓDROMO ==========
+        hipodromo: {
+          id: String(betData.hipodromoId || betData.carreraId || ""),
+          nombre: String(betData.hipodromoNombre || "Hipódromo desconocido"),
+        },
+
+        // ========== INFORMACIÓN DE LA CARRERA ==========
+        carrera: {
+          id: String(betData.carreraId || ""),
+          numero: Number(betData.numeroCarrera) || 0,
+          fecha: String(betData.fecha || ""),
+          hora: String(betData.hora || "00:00"),
+          fechaTimestamp: toFirestoreTimestamp(betData.fecha),
+        },
+
+        // Metadata adicional de la carrera
+        carreraMetadata: betData.raceMetadata ? {
+          totalCaballos: Number(betData.raceMetadata.totalHorses) || 0,
+          distancia: String(betData.raceMetadata.distance || ""),
+          tipo: String(betData.raceMetadata.type || ""),
+          premio: String(betData.raceMetadata.prize || ""),
+        } : null,
+
+        // ========== INFORMACIÓN DE LA APUESTA ==========
+        tipoApuesta: {
+          tipo: String(betData.betType || ""),
+          label: String(betData.betTypeLabel || betData.betType || ""),
+          descripcion: String(betData.betTypeDescription || ""),
+          modoSeleccion: String(betData.selectionMode || ""),
+        },
+
+        // Indicadores booleanos
+        esApuestaAgrupada: Boolean(betData.isGroupedPositions),
+        esApuestaMultiCarrera: Boolean(betData.isGroupedRaces || betData.isMultiRace),
+
+        // ========== CABALLOS SELECCIONADOS ==========
+        caballos: {
+          seleccionados: caballosSeleccionados,
+          texto: caballosTexto,
+          cantidad: caballosSeleccionados.length,
+          // Información detallada si es apuesta agrupada
+          detalleGrupos: betData.caballosInfo ? cleanFirestoreData(betData.caballosInfo) : null,
+        },
+
+        // ========== MONTOS Y CÁLCULOS ==========
+        montos: {
+          montoPorCombinacion: Number(betData.amount) || 0,
+          numeroCombinaciones: Number(betData.combinaciones) || 1,
+          montoTotal: Number(betData.montoTotal) || Number(betData.amount) || 0,
+          gananciaPotencial: Number(betData.potentialWin) || 0,
+          
+          // Sistema de VALES
+          usaVales: Boolean(betData.usesVales),
+          dividendo: Number(betData.dividendo) || 0,
+          valesApostados: Number(betData.valesApostados) || 0,
+          
+          // Límites
+          apuestaMinima: Number(betData.apuestaMinima) || 200,
+          apuestaMaxima: Number(betData.apuestaMaxima) || 50000,
+        },
+
+        // ========== ESTADO DE LA APUESTA ==========
+        estado: "PENDIENTE",
+        estadoDetallado: {
+          estado: "PENDIENTE",
+          mensaje: "Esperando resultado de la carrera",
+          fechaUltimaActualizacion: Timestamp.now(),
+        },
+
+        // ========== RESULTADOS (se llenará después) ==========
+        resultado: {
+          posicionesFinales: null,
+          gananciaReal: 0,
+          esGanadora: false,
+          fechaResolucion: null,
+        },
+
+        // ========== INFORMACIÓN DEL USUARIO ==========
+        usuario: {
+          id: String(userId || ""),
+          email: String(betData.userEmail || ""),
+        },
+
+        // ========== TIMESTAMPS ==========
+        timestamps: {
+          creacion: Timestamp.now(),
+          creacionISO: new Date().toISOString(),
+          unix: Date.now(),
+        },
+
+        // ========== METADATA ADICIONAL ==========
+        metadata: {
+          version: "2.0",
+          app: "HipodromoApp",
+          dispositivo: navigator.userAgent || "Desconocido",
+        },
+      };
+
+      // ========== LIMPIAR DATOS ==========
+      const cleanedData = cleanFirestoreData(apuestaData);
+
+      console.log("🔥 Datos FINALES limpiados para Firebase:");
+      console.log(JSON.stringify(cleanedData, null, 2));
+
+      // ========== GUARDAR EN FIREBASE ==========
+      const apuestasRef = collection(db, "USUARIOS", userId, "APUESTAS");
+      const docRef = await addDoc(apuestasRef, cleanedData);
+
+      console.log("✅ Apuesta guardada con ID:", docRef.id);
+
+      // ========== ACTUALIZAR SALDO DEL USUARIO ==========
+      const userRef = doc(db, "USUARIOS", userId);
+      await updateDoc(userRef, {
+        SALDO: increment(-cleanedData.montos.montoTotal),
+        ULTIMA_APUESTA: Timestamp.now(),
+      });
+
+      console.log(`💰 Saldo actualizado: -$${cleanedData.montos.montoTotal}`);
+
+      // ========== GUARDAR REGISTRO EN COLECCIÓN GLOBAL (OPCIONAL) ==========
+      // Esto es útil para tener todas las apuestas en un solo lugar
+      try {
+        const apuestasGlobalRef = collection(db, "APUESTAS_GLOBAL");
+        await addDoc(apuestasGlobalRef, {
+          ...cleanedData,
+          apuestaId: docRef.id,
+          usuarioId: userId,
+        });
+        console.log("✅ Apuesta también guardada en APUESTAS_GLOBAL");
+      } catch (error) {
+        console.warn("⚠️ No se pudo guardar en APUESTAS_GLOBAL:", error);
+        // No es crítico, continuar
+      }
+
+      return {
+        success: true,
+        apuestaId: docRef.id,
+        valesApostados: cleanedData.montos.valesApostados,
+        montoTotal: cleanedData.montos.montoTotal,
+        mensaje: cleanedData.montos.usaVales
+          ? `Apuesta registrada - ${cleanedData.montos.valesApostados} vales`
+          : "Apuesta registrada exitosamente",
+      };
+
+    } catch (error) {
+      console.error("❌ Error al crear apuesta:", error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   },
 
-  // 🔥 NUEVO: Escuchar apuestas del usuario en tiempo real
+  // 🔥 ESCUCHAR APUESTAS EN TIEMPO REAL
   listenToUserBets: (userId, callback) => {
     const apuestasRef = collection(db, "USUARIOS", userId, "APUESTAS");
-    const q = query(apuestasRef, orderBy("timestamp", "desc"));
+    const q = query(apuestasRef, orderBy("timestamps.creacion", "desc"));
 
-    console.log("🔥 Iniciando listener de apuestas para usuario:", userId);
+    console.log("🔥 Iniciando listener de apuestas para:", userId);
 
     const unsubscribe = onSnapshot(
       q,
@@ -96,13 +307,11 @@ const betService = {
           });
         });
 
-        console.log(
-          `🔄 Apuestas actualizadas en tiempo real: ${apuestas.length}`
-        );
+        console.log(`🔄 ${apuestas.length} apuestas actualizadas`);
         callback(apuestas);
       },
       (error) => {
-        console.error("❌ Error en listener de apuestas:", error);
+        console.error("❌ Error en listener:", error);
         callback([]);
       }
     );
@@ -110,29 +319,24 @@ const betService = {
     return unsubscribe;
   },
 
-  // 🔥 NUEVO: Escuchar cambios en una apuesta específica
+  // 🔥 ESCUCHAR UNA APUESTA ESPECÍFICA
   listenToBet: (userId, apuestaId, callback) => {
     const apuestaRef = doc(db, "USUARIOS", userId, "APUESTAS", apuestaId);
 
-    console.log("🔥 Iniciando listener para apuesta:", apuestaId);
+    console.log("🔥 Escuchando apuesta:", apuestaId);
 
     const unsubscribe = onSnapshot(
       apuestaRef,
       (doc) => {
         if (doc.exists()) {
-          const apuesta = {
-            id: doc.id,
-            ...doc.data(),
-          };
-          console.log("🔄 Apuesta actualizada en tiempo real:", apuestaId);
-          callback(apuesta);
+          callback({ id: doc.id, ...doc.data() });
         } else {
-          console.warn("⚠️ Apuesta no encontrada:", apuestaId);
+          console.warn("⚠️ Apuesta no existe");
           callback(null);
         }
       },
       (error) => {
-        console.error("❌ Error en listener de apuesta:", error);
+        console.error("❌ Error:", error);
         callback(null);
       }
     );
@@ -140,170 +344,12 @@ const betService = {
     return unsubscribe;
   },
 
-  // Crear apuesta en Firebase
-  createBet: async (userId, betData, userSaldo) => {
-    try {
-      // Validar que el usuario tenga saldo suficiente
-      if (userSaldo < betData.amount) {
-        throw new Error("Saldo insuficiente para realizar esta apuesta");
-      }
-
-      // ✅ Asegurar que selectedHorses sea un array válido
-      let horsesArray = [];
-      if (Array.isArray(betData.selectedHorses)) {
-        horsesArray = betData.selectedHorses.filter((h) => h != null);
-      } else if (betData.selectedHorses) {
-        horsesArray = [betData.selectedHorses];
-      }
-
-      if (horsesArray.length === 0) {
-        throw new Error("Debes seleccionar al menos un caballo");
-      }
-
-      console.log("🐴 Caballos recibidos en betData:", horsesArray);
-
-      // ✅ Preparar caballos seleccionados
-      const caballosSeleccionados = horsesArray.map((horse) => {
-        const numero = Number(horse.number) || Number(horse.numero) || 0;
-        const nombre = String(
-          horse.name || horse.nombre || `CABALLO ${numero}`
-        );
-
-        console.log("🐴 Procesando caballo:", {
-          original: horse,
-          numero,
-          nombre,
-        });
-
-        return {
-          numero: numero,
-          nombre: nombre,
-        };
-      });
-
-      const caballosTexto = caballosSeleccionados
-        .map((c) => `#${c.numero} ${c.nombre}`)
-        .join(", ");
-
-      console.log("✅ Caballos procesados:", caballosSeleccionados);
-      console.log("✅ Texto de caballos:", caballosTexto);
-
-      // ✅ Validar y limpiar campos obligatorios
-      const hipodromoId = String(betData.hipodromoId || "");
-      const hipodromoNombre = String(
-        betData.hipodromoNombre || betData.hipodromo || "Hipódromo desconocido"
-      );
-      const carreraId = String(betData.carreraId || "");
-      const numeroCarrera = Number(betData.numeroCarrera) || 0;
-      const fecha = toFirestoreTimestamp(betData.fecha);
-      const hora = String(betData.hora || "00:00");
-      const tipoApuesta = String(betData.betType || "");
-      const montoApostado = Number(betData.amount) || 0;
-      const gananciaPotencial = Number(betData.potentialWin) || 0;
-
-      // 🎯 Obtener dividendo y calcular vales
-      const dividendo = Number(betData.dividendo) || 100;
-      const valesApostados =
-        Number(betData.valesApostados) || Math.floor(montoApostado / dividendo);
-
-      console.log("💰 Sistema de VALES:", {
-        montoApostado,
-        dividendo,
-        valesApostados,
-        calculo: `${montoApostado} ÷ ${dividendo} = ${valesApostados}`,
-      });
-
-      // Crear la apuesta en la subcolección APUESTAS del usuario
-      const apuestasRef = collection(db, "USUARIOS", userId, "APUESTAS");
-
-      // ✅ Construir objeto con VALES incluidos
-      const apuestaData = {
-        // Información del hipódromo
-        hipodromoId: hipodromoId,
-        hipodromoNombre: hipodromoNombre,
-
-        // Información de la carrera
-        carreraId: carreraId,
-        numeroCarrera: numeroCarrera,
-        fecha: fecha,
-        hora: hora,
-
-        // Información de la apuesta
-        tipoApuesta: tipoApuesta,
-        caballosSeleccionados: caballosSeleccionados,
-        caballosTexto: caballosTexto,
-
-        // Montos
-        montoApostado: montoApostado,
-        gananciaPotencial: gananciaPotencial,
-
-        // 🎯 Sistema de VALES
-        dividendo: dividendo,
-        valesApostados: valesApostados,
-
-        // Estado
-        estado: "PENDIENTE",
-
-        // Metadata
-        fechaCreacion: Timestamp.now(),
-        timestamp: Date.now(),
-      };
-
-      console.log(
-        "🔥 Datos FINALES para Firestore CON VALES:",
-        JSON.stringify(apuestaData, null, 2)
-      );
-
-      // ✅ Verificación final
-      if (
-        !apuestaData.caballosSeleccionados ||
-        apuestaData.caballosSeleccionados.length === 0
-      ) {
-        throw new Error("Error: no hay caballos seleccionados");
-      }
-
-      if (!apuestaData.caballosTexto) {
-        throw new Error("Error: falta texto de caballos");
-      }
-
-      if (!apuestaData.valesApostados || apuestaData.valesApostados <= 0) {
-        throw new Error("Error: los vales apostados deben ser mayor a 0");
-      }
-
-      // Guardar la apuesta
-      const docRef = await addDoc(apuestasRef, apuestaData);
-
-      console.log("✅ Apuesta guardada con ID:", docRef.id);
-      console.log(`💰 Vales apostados: ${valesApostados}`);
-      console.log(
-        "🔥 La apuesta será detectada automáticamente por los listeners en tiempo real"
-      );
-
-      // Restar el monto del saldo del usuario
-      const userRef = doc(db, "USUARIOS", userId);
-      await updateDoc(userRef, {
-        SALDO: increment(-montoApostado),
-      });
-
-      return {
-        success: true,
-        apuestaId: docRef.id,
-        valesApostados: valesApostados,
-        mensaje: `Apuesta registrada exitosamente - ${valesApostados} vales apostados`,
-      };
-    } catch (error) {
-      console.error("❌ Error al crear apuesta:", error);
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  },
-
+  // 🔥 OBTENER TODAS LAS APUESTAS
   getUserBets: async (userId) => {
     try {
       const apuestasRef = collection(db, "USUARIOS", userId, "APUESTAS");
-      const snapshot = await getDocs(apuestasRef);
+      const q = query(apuestasRef, orderBy("timestamps.creacion", "desc"));
+      const snapshot = await getDocs(q);
 
       const apuestas = [];
       snapshot.forEach((doc) => {
@@ -313,37 +359,32 @@ const betService = {
         });
       });
 
-      // Ordenar por fecha de creación (más recientes primero)
-      return apuestas.sort((a, b) => b.timestamp - a.timestamp);
+      return apuestas;
     } catch (error) {
-      console.error("Error al obtener apuestas:", error);
+      console.error("❌ Error al obtener apuestas:", error);
       return [];
     }
   },
 
-  // Validar apuesta antes de crearla
+  // 🔥 VALIDAR APUESTA
   validateBet: (betData, userSaldo) => {
     const errors = [];
 
-    if (!betData.amount || betData.amount < 200) {
+    const montoTotal = betData.montoTotal || betData.amount || 0;
+
+    if (montoTotal < 200) {
       errors.push("El monto mínimo de apuesta es $200");
     }
 
-    if (betData.amount > 50000) {
-      errors.push("El monto máximo de apuesta es $50,000");
+    if (montoTotal > 500000) {
+      errors.push("El monto máximo de apuesta es $500,000");
     }
 
-    if (userSaldo < betData.amount) {
-      errors.push("Saldo insuficiente para realizar esta apuesta");
+    if (userSaldo < montoTotal) {
+      errors.push(`Saldo insuficiente. Necesitas $${montoTotal.toLocaleString("es-AR")}`);
     }
 
-    const horsesArray = Array.isArray(betData.selectedHorses)
-      ? betData.selectedHorses.filter((h) => h != null)
-      : betData.selectedHorses
-      ? [betData.selectedHorses]
-      : [];
-
-    if (horsesArray.length === 0) {
+    if (!betData.selectedHorses || betData.selectedHorses.length === 0) {
       errors.push("Debes seleccionar al menos un caballo");
     }
 
@@ -353,38 +394,43 @@ const betService = {
     };
   },
 
-  // Actualizar estado de una apuesta
+  // 🔥 ACTUALIZAR ESTADO DE APUESTA
   updateBetStatus: async (userId, apuestaId, nuevoEstado, gananciaReal = 0) => {
     try {
       const apuestaRef = doc(db, "USUARIOS", userId, "APUESTAS", apuestaId);
 
       const updateData = {
         estado: nuevoEstado,
-        fechaActualizacion: Timestamp.now(),
+        "estadoDetallado.estado": nuevoEstado,
+        "estadoDetallado.fechaUltimaActualizacion": Timestamp.now(),
+        "resultado.fechaResolucion": Timestamp.now(),
       };
 
-      // Si la apuesta fue ganada, actualizar ganancia real y saldo del usuario
       if (nuevoEstado === "GANADA" && gananciaReal > 0) {
-        updateData.gananciaReal = gananciaReal;
+        updateData["resultado.gananciaReal"] = gananciaReal;
+        updateData["resultado.esGanadora"] = true;
 
+        // Actualizar saldo del usuario
         const userRef = doc(db, "USUARIOS", userId);
         await updateDoc(userRef, {
           SALDO: increment(gananciaReal),
         });
+
+        console.log(`💰 Usuario ganó: $${gananciaReal}`);
+      } else if (nuevoEstado === "PERDIDA") {
+        updateData["resultado.esGanadora"] = false;
       }
 
       await updateDoc(apuestaRef, updateData);
 
-      console.log(
-        "🔄 Estado de apuesta actualizado - listeners detectarán el cambio automáticamente"
-      );
+      console.log(`✅ Estado actualizado a: ${nuevoEstado}`);
 
       return {
         success: true,
-        mensaje: "Estado de la apuesta actualizado",
+        mensaje: `Apuesta ${nuevoEstado.toLowerCase()}`,
       };
     } catch (error) {
-      console.error("Error al actualizar estado de apuesta:", error);
+      console.error("❌ Error al actualizar estado:", error);
       return {
         success: false,
         error: error.message,
@@ -392,32 +438,44 @@ const betService = {
     }
   },
 
-  // Cancelar apuesta (solo si está pendiente)
-  cancelBet: async (userId, apuestaId, montoApostado) => {
+  // 🔥 CANCELAR APUESTA
+  cancelBet: async (userId, apuestaId) => {
     try {
       const apuestaRef = doc(db, "USUARIOS", userId, "APUESTAS", apuestaId);
+      
+      // Obtener el monto a reembolsar
+      const apuestaDoc = await apuestaRef.get();
+      if (!apuestaDoc.exists()) {
+        throw new Error("Apuesta no encontrada");
+      }
 
+      const apuestaData = apuestaDoc.data();
+      const montoReembolso = apuestaData.montos?.montoTotal || 0;
+
+      // Actualizar estado
       await updateDoc(apuestaRef, {
         estado: "CANCELADA",
-        fechaCancelacion: Timestamp.now(),
+        "estadoDetallado.estado": "CANCELADA",
+        "estadoDetallado.mensaje": "Apuesta cancelada por el usuario",
+        "estadoDetallado.fechaUltimaActualizacion": Timestamp.now(),
+        "resultado.fechaResolucion": Timestamp.now(),
       });
 
-      // Devolver el monto al saldo del usuario
+      // Reembolsar saldo
       const userRef = doc(db, "USUARIOS", userId);
       await updateDoc(userRef, {
-        SALDO: increment(montoApostado),
+        SALDO: increment(montoReembolso),
       });
 
-      console.log(
-        "🔄 Apuesta cancelada - listeners detectarán el cambio automáticamente"
-      );
+      console.log(`✅ Apuesta cancelada y reembolsado: $${montoReembolso}`);
 
       return {
         success: true,
         mensaje: "Apuesta cancelada y saldo reembolsado",
+        montoReembolsado: montoReembolso,
       };
     } catch (error) {
-      console.error("Error al cancelar apuesta:", error);
+      console.error("❌ Error al cancelar apuesta:", error);
       return {
         success: false,
         error: error.message,
@@ -425,7 +483,7 @@ const betService = {
     }
   },
 
-  // Obtener estadísticas de apuestas del usuario
+  // 🔥 ESTADÍSTICAS DEL USUARIO
   getUserBetStats: async (userId) => {
     try {
       const apuestas = await betService.getUserBets(userId);
@@ -436,23 +494,23 @@ const betService = {
         ganadas: apuestas.filter((a) => a.estado === "GANADA").length,
         perdidas: apuestas.filter((a) => a.estado === "PERDIDA").length,
         canceladas: apuestas.filter((a) => a.estado === "CANCELADA").length,
+        
         totalApostado: apuestas.reduce(
-          (sum, a) => sum + (a.montoApostado || 0),
+          (sum, a) => sum + (a.montos?.montoTotal || 0),
           0
         ),
         totalGanado: apuestas
           .filter((a) => a.estado === "GANADA")
-          .reduce((sum, a) => sum + (a.gananciaReal || 0), 0),
-        // 🎯 Total de vales apostados
+          .reduce((sum, a) => sum + (a.resultado?.gananciaReal || 0), 0),
         totalValesApostados: apuestas.reduce(
-          (sum, a) => sum + (a.valesApostados || 0),
+          (sum, a) => sum + (a.montos?.valesApostados || 0),
           0
         ),
       };
 
       return stats;
     } catch (error) {
-      console.error("Error al obtener estadísticas:", error);
+      console.error("❌ Error en estadísticas:", error);
       return null;
     }
   },

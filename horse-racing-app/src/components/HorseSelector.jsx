@@ -42,7 +42,7 @@ const HorseSelector = ({
   if (!horses || horses.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <AlertCircle className="w-16 h-16 text-slate-600 mb-4" />
+        <AlertCircle className="w-16 h-16 text-slate-600 mb-4" />np
         <p className="text-slate-400 text-center">
           No hay caballos disponibles para esta carrera
         </p>
