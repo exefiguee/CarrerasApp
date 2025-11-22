@@ -306,6 +306,54 @@ const RacesList = ({ onSelectRace }) => {
     cargarTransmisiones();
   }, []);
 
+  // 🔥 FUNCIÓN PARA VERIFICAR SI UNA CARRERA ES DEL DÍA ACTUAL
+  const esCarreraDelDia = (carrera) => {
+    try {
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0); // Resetear a medianoche
+
+      const manana = new Date(hoy);
+      manana.setDate(manana.getDate() + 1); // Siguiente día a medianoche
+
+      let fechaCarrera;
+
+      // Si la carrera tiene un Timestamp de Firestore
+      if (carrera.fecha && carrera.fecha.toDate) {
+        fechaCarrera = carrera.fecha.toDate();
+      }
+      // Si tiene fecha_texto, parsearlo
+      else if (carrera.fecha_texto) {
+        let day, month, year;
+
+        if (carrera.fecha_texto.includes("/")) {
+          [day, month, year] = carrera.fecha_texto.split("/");
+        } else if (carrera.fecha_texto.includes("-")) {
+          [year, month, day] = carrera.fecha_texto.split("-");
+        } else {
+          return false;
+        }
+
+        const yearNum = parseInt(year);
+        const monthNum = parseInt(month);
+        const dayNum = parseInt(day);
+
+        if (isNaN(yearNum) || isNaN(monthNum) || isNaN(dayNum)) {
+          return false;
+        }
+
+        fechaCarrera = new Date(yearNum, monthNum - 1, dayNum);
+      } else {
+        return false;
+      }
+
+      // Verificar que la fecha de la carrera esté entre hoy a las 00:00 y mañana a las 00:00
+      return fechaCarrera >= hoy && fechaCarrera < manana;
+    } catch (error) {
+      console.error("Error verificando fecha de carrera:", error);
+      return false;
+    }
+  };
+
   // 🔥 NUEVO: Listener en tiempo real para carreras de Firestore
   useEffect(() => {
     console.log("🔥 Iniciando listener en tiempo real para carreras...");
@@ -317,18 +365,22 @@ const RacesList = ({ onSelectRace }) => {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const carreras = [];
+        const todasLasCarreras = [];
         snapshot.forEach((doc) => {
-          carreras.push({
+          todasLasCarreras.push({
             firebaseId: doc.id,
             ...doc.data(),
           });
         });
 
+        // 🔥 FILTRAR SOLO CARRERAS DEL DÍA ACTUAL
+        const carrerasFiltradas = todasLasCarreras.filter(esCarreraDelDia);
+
         console.log(
-          `🔄 Actualización en tiempo real: ${carreras.length} carreras`
+          `🔄 Actualización en tiempo real: ${carrerasFiltradas.length} carreras del día (${todasLasCarreras.length} totales)`
         );
-        setCarrerasFromFirestore(carreras);
+        setCarrerasFromFirestore(carrerasFiltradas);
+
         setUsandoFirestore(true);
         setLoading(false);
       },
@@ -555,6 +607,45 @@ const RacesList = ({ onSelectRace }) => {
     try {
       if (!jsonData || !jsonData.carreras) return;
 
+      // 🔥 FILTRAR SOLO HIPÓDROMOS DE ARGENTINA
+      // 🔥 FILTRAR SOLO HIPÓDROMOS: PALERMO, SAN ISIDRO, LA PLATA
+      const nombresPermitidos = ["PALERMO", "SAN ISIDRO", "LA PLATA"];
+
+      const hipodromosArg = jsonData.hipodromos.filter((h) => {
+        const descripcion = (h.descripcion || "").toUpperCase();
+        const coincide = nombresPermitidos.some((nombre) =>
+          descripcion.includes(nombre)
+        );
+
+        if (coincide) {
+          console.log(
+            `✅ Hipódromo encontrado: ${h.descripcion} (ID: ${h.id})`
+          );
+        }
+
+        return coincide;
+      });
+
+      console.log(
+        `🏟️ Total hipódromos argentinos filtrados: ${hipodromosArg.length}`
+      );
+
+      const idsHipodromosArg = new Set(hipodromosArg.map((h) => h.id));
+
+      // 🔥 FILTRAR CARRERAS QUE PERTENEZCAN A ESOS HIPÓDROMOS
+      const carrerasFiltradas = jsonData.carreras.filter((carrera) =>
+        idsHipodromosArg.has(carrera.id_hipodromo)
+      );
+
+      console.log(
+        `🇦🇷 Carreras de Argentina encontradas: ${carrerasFiltradas.length}`
+      );
+      console.log(
+        `🚫 Carreras totales: ${jsonData.carreras.length}, Filtradas: ${
+          jsonData.carreras.length - carrerasFiltradas.length
+        }`
+      );
+
       const carrerasRef = collection(db, "carreras1");
       const querySnapshot = await getDocs(carrerasRef);
       const carrerasExistentes = new Map();
@@ -567,15 +658,11 @@ const RacesList = ({ onSelectRace }) => {
         });
       });
 
-      console.log(
-        `📊 ${carrerasExistentes.size} carreras existentes en Firestore`
-      );
-
       let nuevas = 0;
-      let actualizadas = 0;
       let sinCambios = 0;
 
-      for (const carrera of jsonData.carreras) {
+      // 🔥 RECORRER SOLO CARRERAS ARGENTINAS
+      for (const carrera of carrerasFiltradas) {
         const carreraExistente = carrerasExistentes.get(carrera.id);
 
         if (carreraExistente) {
@@ -583,7 +670,7 @@ const RacesList = ({ onSelectRace }) => {
           continue;
         }
 
-        const hipodromoInfo = jsonData.hipodromos.find(
+        const hipodromoInfo = hipodromosArg.find(
           (h) => h.id === carrera.id_hipodromo
         );
 
@@ -612,18 +699,13 @@ const RacesList = ({ onSelectRace }) => {
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
         });
+
         nuevas++;
-        console.log(
-          `✨ Nueva carrera ${carrera.num_carrera} agregada con tipos de apuestas`
-        );
       }
 
-      console.log(`
-✅ Sincronización completada:
-   ✨ ${nuevas} nuevas
-   🔄 ${actualizadas} actualizadas
-   ⏭️  ${sinCambios} sin cambios
-      `);
+      console.log(
+        `🇦🇷 Guardado finalizado: ${nuevas} nuevas, ${sinCambios} sin cambios.`
+      );
     } catch (error) {
       console.error("❌ Error guardando carreras:", error);
     }
@@ -652,7 +734,6 @@ const RacesList = ({ onSelectRace }) => {
       setLoading(false);
     }
   };
-
   const cargarTransmisiones = async () => {
     try {
       const res = await fetch("https://xwdc.net/nuevo/ext_gruposv2.php");
