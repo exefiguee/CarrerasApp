@@ -333,7 +333,6 @@ const handleConfirmBet = async () => {
           } : null
         };
 
-        // Agregar todos los caballos al array principal
         caballosData.push(...raceHorses);
       }
     }
@@ -351,7 +350,6 @@ const handleConfirmBet = async () => {
           jockey: h.jockey || ""
         }));
 
-        // Agregar todos los caballos al array principal
         caballosData.push(...positionHorses);
       }
     }
@@ -383,7 +381,6 @@ const handleConfirmBet = async () => {
         return total;
       }
 
-      // Otros tipos de apuesta
       const n = caballosData.length;
       if (config.type === "tira") return 3;
       if (config.selectionMode === "single") return 1;
@@ -415,28 +412,19 @@ const handleConfirmBet = async () => {
 
     // 🔥 OBJETO COMPLETO DE LA APUESTA
     const betData = {
-      // ========== INFORMACIÓN DEL HIPÓDROMO ==========
       hipodromoId: currentRaceData.firebaseId || currentRaceData.id || "",
       hipodromoNombre: currentRaceData.venue || currentRaceData.descripcion_hipodromo || "",
-      
-      // ========== INFORMACIÓN DE LA CARRERA ==========
       carreraId: currentRaceData.firebaseId || currentRaceData.id || "",
       numeroCarrera: parseInt(currentRaceData.raceNumber || currentRaceData.num_carrera || 0),
       fecha: currentRaceData.date || currentRaceData.fecha_texto || new Date().toISOString().split('T')[0],
       hora: currentRaceData.time || currentRaceData.hora || "",
-      
-      // ========== INFORMACIÓN DE LA APUESTA ==========
       betType: config.originalKey || betType,
       betTypeLabel: config.label || betType,
       betTypeDescription: config.description || "",
-      
-      // Tipo de selección
       selectionMode: config.selectionMode,
       isGroupedPositions: config.selectionMode === "grouped-positions",
       isGroupedRaces: config.selectionMode === "grouped-races",
       isMultiRace: selectedHorses?.multiRace || false,
-      
-      // ========== CABALLOS SELECCIONADOS ==========
       selectedHorses: caballosData.map(h => ({
         numero: h.number,
         nombre: h.name,
@@ -444,37 +432,21 @@ const handleConfirmBet = async () => {
         noCorre: h.noCorre || false,
         scratched: h.scratched || false
       })),
-      
-      // Información detallada según tipo de apuesta
       caballosInfo: Object.keys(caballosInfo).length > 0 ? caballosInfo : null,
-      
-      // ========== MONTOS Y CÁLCULOS ==========
-      amount: amount, // Monto base por combinación
+      amount: amount,
       combinaciones: combinacionesFinales,
-      montoTotal: montoTotal, // Monto total (amount × combinaciones)
-      potentialWin: montoTotal * (config.multiplier || 2), // Ganancia potencial
-      
-      // Sistema de VALES
+      montoTotal: montoTotal,
+      potentialWin: montoTotal * (config.multiplier || 2),
       dividendo: dividendo,
       valesApostados: valesApostados,
       usesVales: usesVales,
-      
-      // Límites de la apuesta
       apuestaMinima: config.apuestaMinima || 200,
       apuestaMaxima: config.apuestaMaxima || 50000,
-      
-      // ========== INFORMACIÓN ADICIONAL ==========
       timestamp: Date.now(),
       fechaCreacion: new Date().toISOString(),
-      
-      // Información del usuario
       userId: user?.uid || user?.id || "",
       userEmail: user?.email || "",
-      
-      // Estado inicial
       estado: "PENDIENTE",
-      
-      // Metadata de la carrera
       raceMetadata: {
         totalHorses: currentRaceData.horses?.length || 0,
         distance: currentRaceData.distance || currentRaceData.distancia || "",
@@ -484,13 +456,6 @@ const handleConfirmBet = async () => {
     };
 
     console.log("🔥 Datos COMPLETOS de la apuesta:", betData);
-    console.log("💰 Montos:", {
-      base: amount,
-      combinaciones: combinacionesFinales,
-      total: montoTotal,
-      vales: valesApostados,
-      dividendo: dividendo
-    });
 
     // 🎯 Validar antes de enviar
     const validation = betService.validateBet(betData, userSaldo);
@@ -504,15 +469,15 @@ const handleConfirmBet = async () => {
 
     if (result.success) {
       console.log("✅ Apuesta creada exitosamente:", result.apuestaId);
-      alert(`✅ Apuesta registrada con éxito!\n\nID: ${result.apuestaId}\nVales: ${result.valesApostados || "N/A"}\nMonto total: $${montoTotal.toLocaleString("es-AR")}`);
       
-      // Llamar al callback si existe
+      // 🎯 Llamar al callback PERO NO CERRAR
       if (onConfirmBet) {
         onConfirmBet(result);
       }
       
-      // Cerrar el modal
-      onClose();
+      // 🚫 NO LLAMAR onClose() - dejar que BetAmount muestre el ticket
+      // onClose(); // <--- COMENTADO
+      
     } else {
       console.error("❌ Error al crear apuesta:", result.error);
       alert("❌ Error al crear la apuesta: " + result.error);
@@ -523,7 +488,6 @@ const handleConfirmBet = async () => {
     alert("❌ Error al confirmar la apuesta: " + error.message);
   }
 };
-
 // 🔧 Función auxiliar para calcular factorial (si no existe ya en tu componente)
 const factorial = (n) => {
   if (n <= 1) return 1;
@@ -701,7 +665,7 @@ const factorial = (n) => {
                 />
               )}
 
-              {step === 3 && (
+          {step === 3 && (
                 <BetAmount
                   betType={betType}
                   selectedHorses={selectedHorses}
@@ -716,6 +680,7 @@ const factorial = (n) => {
                   maxBetAmount={betTypes[betType]?.apuestaMaxima}
                   minBetAmount={betTypes[betType]?.apuestaMinima}
                   betTypeConfig={betTypes[betType]}
+                  onClose={onClose} // 🔥 AGREGAR ESTA LÍNEA
                 />
               )}
             </>

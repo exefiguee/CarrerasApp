@@ -142,13 +142,14 @@ const betService = {
           nombre: String(betData.hipodromoNombre || "Hipódromo desconocido"),
         },
 
-        // ========== INFORMACIÓN DE LA CARRERA ==========
-        carrera: {
+      carrera: {
           id: String(betData.carreraId || ""),
           numero: Number(betData.numeroCarrera) || 0,
           fecha: String(betData.fecha || ""),
           hora: String(betData.hora || "00:00"),
-          fechaTimestamp: toFirestoreTimestamp(betData.fecha),
+          fechaTimestamp: toFirestoreTimestamp(
+            `${betData.fecha} ${betData.hora || "00:00"}`
+          ),
         },
 
         // Metadata adicional de la carrera
