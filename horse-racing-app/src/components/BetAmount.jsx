@@ -33,7 +33,15 @@ const BetAmount = ({
     minBetAmount,
     maxBetAmount,
     userSaldo,
+    dividendo: raceData?.dividendo,
   });
+
+  // 🎯 Determinar si esta apuesta usa VALES
+  const usesVales = () => {
+    const excludedTypes = ["ganador", "segundo", "tercero"];
+    const normalizedType = betTypeConfig?.originalKey?.toLowerCase().trim();
+    return !excludedTypes.includes(normalizedType);
+  };
 
   // 🎯 Detectar si selectedHorses es un objeto agrupado o un array
   const isGroupedSelection = selectedHorses?.grouped === true;
@@ -54,6 +62,36 @@ const BetAmount = ({
   const calculateCombinations = () => {
     const selectionMode = betTypeConfig?.selectionMode;
 
+    // 🔥 Para apuestas multi-carrera (DOBLE, TRIPLO, PICK)
+    if (selectionMode === "grouped-races" || selectedHorses?.multiRace) {
+      const races = betTypeConfig?.races || 2;
+      let total = 1;
+
+      // Multiplicar caballos de CADA carrera
+      for (let i = 1; i <= races; i++) {
+        const raceKey = `race${i}`;
+        const raceHorses = selectedHorses?.[raceKey] || [];
+
+        // 🔥 Solo contar caballos válidos (sin noCorre ni scratched)
+        const validHorses = raceHorses.filter(
+          (h) => !h.noCorre && !h.scratched
+        );
+        const count = validHorses.length;
+
+        console.log(
+          `💡 Carrera ${i}: ${count} caballos válidos de ${raceHorses.length} seleccionados`
+        );
+
+        if (count === 0) {
+          console.warn(`⚠️ Carrera ${i} no tiene caballos válidos`);
+          return 0;
+        }
+        total *= count;
+      }
+
+      console.log(`💡 Combinaciones multi-carrera (${races} carreras):`, total);
+      return total;
+    }
     // 🔥 Para grupos por posición (EXACTA, IMPERFECTA, TRIFECTA D, CUATRIFECTA D)
     if (selectionMode === "grouped-positions" && isGroupedSelection) {
       const positions = betTypeConfig?.positions || 2;
@@ -109,11 +147,6 @@ const BetAmount = ({
       return factorial(n) / factorial(n - 4);
     }
 
-    // Múltiples carreras: DOBLE, TRIPLO, PICK 4, PICK 5
-    if (selectionMode === "multi-race") {
-      return Math.pow(n, betTypeConfig.races || 1);
-    }
-
     return 1;
   };
 
@@ -138,6 +171,19 @@ const BetAmount = ({
 
   const totalAmount = calculateTotalAmount(amount);
 
+  // 🎯 Calcular VALES
+  const calculateVales = () => {
+    if (!usesVales() || !raceData?.dividendo || raceData.dividendo === 0) {
+      return null;
+    }
+
+    const vales = totalAmount / raceData.dividendo;
+    return Math.floor(vales); // Redondear hacia abajo
+  };
+
+  const vales = calculateVales();
+  const hasVales = vales !== null;
+
   // 🔥 NUEVO: Validar tope de combinaciones
   const isWithinCombinationLimit = () => {
     const betTypeKey = betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
@@ -161,7 +207,7 @@ const BetAmount = ({
     if (amount < minBetAmount) return false;
     if (amount > maxBetAmount) return false;
     if (totalAmount > userSaldo) return false;
-    if (!isWithinCombinationLimit()) return false; // 🔥 NUEVO
+    if (!isWithinCombinationLimit()) return false;
     return true;
   };
 
@@ -178,7 +224,7 @@ const BetAmount = ({
       )}`;
     }
 
-    // 🔥 NUEVO: Mensaje para tope de combinaciones
+    // 🔥 Mensaje para tope de combinaciones
     if (!isWithinCombinationLimit()) {
       const betTypeKey = betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
       const limites = raceData?.limitesApuestas?.[betTypeKey];
@@ -219,6 +265,8 @@ const BetAmount = ({
         baseAmount: amount,
         combinaciones,
         totalAmount,
+        vales: hasVales ? vales : null,
+        dividendo: hasVales ? raceData?.dividendo : null,
       });
       onConfirm();
     }
@@ -226,6 +274,54 @@ const BetAmount = ({
 
   // 🎯 Función para renderizar los caballos seleccionados
   const renderSelectedHorses = () => {
+    // 🔥 Para apuestas multi-carrera (DOBLE, TRIPLO, PICK)
+    if (
+      betTypeConfig?.selectionMode === "grouped-races" ||
+      selectedHorses?.multiRace
+    ) {
+      const races = betTypeConfig?.races || 2;
+
+      return (
+        <div className="space-y-2">
+          {Array.from({ length: races }, (_, index) => {
+            const raceKey = `race${index + 1}`;
+            const raceHorses = selectedHorses?.[raceKey] || [];
+            const raceInfo = selectedHorses?.[`${raceKey}Info`];
+
+            return (
+              <div key={raceKey} className="flex justify-between items-start">
+                <span className="text-slate-400">
+                  {raceInfo ? (
+                    <>
+                      Carrera {raceInfo.number}
+                      <span className="text-xs block mt-0.5">
+                        {raceInfo.venue} - {raceInfo.date} {raceInfo.time}
+                      </span>
+                    </>
+                  ) : (
+                    `Carrera ${index + 1}:`
+                  )}
+                </span>
+                <span className="text-white font-semibold text-right">
+                  {raceHorses.length > 0
+                    ? raceHorses
+                        .map((h) => {
+                          // Mostrar "NO CORRE" si el caballo no está corriendo
+                          if (h.noCorre || h.scratched) {
+                            return `#${h.number} (NO CORRE)`;
+                          }
+                          return `#${h.number}`;
+                        })
+                        .join(", ")
+                    : "-"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
     if (isGroupedSelection) {
       const positions = betTypeConfig?.positions || 2;
 
@@ -330,7 +426,7 @@ const BetAmount = ({
             </div>
           </div>
 
-          {/* 🔥 NUEVO: Información de tope de combinaciones */}
+          {/* 🔥 Información de tope de combinaciones */}
           {(() => {
             const betTypeKey =
               betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
@@ -438,6 +534,35 @@ const BetAmount = ({
                 {betTypeConfig.label})
               </p>
             )}
+          </div>
+        )}
+
+        {/* 🎯 VALES - Sistema completo */}
+        {hasVales && totalAmount > 0 && raceData?.dividendo && (
+          <div className="mt-3 pt-3 border-t border-amber-500/30">
+            <div className="bg-gradient-to-r from-fuchsia-500/20 to-purple-500/20 border border-fuchsia-500/30 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-fuchsia-300 font-semibold text-sm flex items-center gap-2">
+                  🎟️ Tu apuesta equivale a:
+                </span>
+                <span className="text-2xl font-bold text-fuchsia-300">
+                  {vales} {vales === 1 ? "vale" : "vales"}
+                </span>
+              </div>
+              <div className="text-xs text-slate-400 space-y-1">
+                <p>
+                  💡 Cálculo: ${totalAmount.toLocaleString("es-AR")} ÷ $
+                  {raceData.dividendo.toLocaleString("es-AR")} (dividendo) ={" "}
+                  {vales} vales
+                </p>
+                {totalAmount % raceData.dividendo !== 0 && (
+                  <p className="text-amber-400">
+                    ⚠️ El resto se descarta: $
+                    {(totalAmount % raceData.dividendo).toLocaleString("es-AR")}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

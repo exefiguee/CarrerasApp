@@ -45,7 +45,6 @@ function CarreraCard({ carrera, isSelected, onSelect }) {
         }
 
         const [hrs, mins] = carrera.hora.split(":");
-
         const yearNum = parseInt(year);
         const monthNum = parseInt(month);
         const dayNum = parseInt(day);
@@ -288,7 +287,8 @@ const RacesList = ({ onSelectRace }) => {
   const [selectedCarrera, setSelectedCarrera] = useState(null);
   const [user, setUser] = useState(null);
 
-  const [iframeUrl, setIframeUrl] = useState("/canalcarreras.html?id=channel");
+  // const [iframeUrl, setIframeUrl] = useState("/canalcarreras.html?id=channel");
+  const [iframeUrl, setIframeUrl] = useState("/sincarreras.html");
 
   const [activeTab, setActiveTab] = useState("hipodromos");
   const [carrerasFromFirestore, setCarrerasFromFirestore] = useState([]);
@@ -398,6 +398,25 @@ const RacesList = ({ onSelectRace }) => {
     };
   }, []);
 
+  // 🔥 NUEVO: SELECCIÓN AUTOMÁTICA DEL PRIMER HIPÓDROMO
+  useEffect(() => {
+    if (data?.hipodromos && !selectedHipodromo) {
+      const hipodromosConCarreras = data.hipodromos.filter((hip) => {
+        const carrerasParaEsteHipo = usandoFirestore
+          ? carrerasFromFirestore.filter((c) => c.id_hipodromo === hip.id)
+          : data.carreras.filter((c) => c.id_hipodromo === hip.id);
+        return carrerasParaEsteHipo.length > 0;
+      });
+
+      if (hipodromosConCarreras.length > 0) {
+        setSelectedHipodromo(hipodromosConCarreras[0].id);
+        console.log(
+          `✅ Hipódromo seleccionado automáticamente: ${hipodromosConCarreras[0].descripcion}`
+        );
+      }
+    }
+  }, [data, usandoFirestore, carrerasFromFirestore, selectedHipodromo]);
+
   useEffect(() => {
     if (transmisiones.length > 0) {
       seleccionarTransmisionArgentina();
@@ -435,7 +454,13 @@ const RacesList = ({ onSelectRace }) => {
     const minutosInicio = horaInicio * 60 + minInicio;
     const minutosFin = horaFin * 60 + minFin;
 
-    if (minutosActuales >= minutosInicio && minutosActuales <= minutosFin) {
+    // Restar 60 minutos (1 hora) al horario de inicio
+    const minutosInicioConMargen = minutosInicio - 60;
+
+    if (
+      minutosActuales >= minutosInicioConMargen &&
+      minutosActuales <= minutosFin
+    ) {
       setIframeUrl(argTransmision.link);
     }
   };
@@ -874,42 +899,33 @@ const RacesList = ({ onSelectRace }) => {
               <div className="p-4 md:p-6 flex-1 overflow-y-auto custom-scrollbar">
                 {activeTab === "hipodromos" && (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-3">
-                      <select
-                        value={selectedHipodromo || ""}
-                        onChange={(e) => {
-                          setSelectedHipodromo(e.target.value || null);
-                          setSelectedCarrera(null);
-                        }}
-                        className="px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-sm font-medium cursor-pointer transition-all hover:border-fuchsia-500/50 focus:outline-none focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-500/20">
-                        <option value="">🏟️ Selecciona un hipódromo</option>
-                        {data?.hipodromos
-                          .filter((hip) => {
-                            const carrerasParaEsteHipo = usandoFirestore
-                              ? carrerasFromFirestore.filter(
-                                  (c) => c.id_hipodromo === hip.id
-                                )
-                              : data.carreras.filter(
-                                  (c) => c.id_hipodromo === hip.id
-                                );
-                            return carrerasParaEsteHipo.length > 0;
-                          })
-                          .map((hip) => {
-                            const carrerasCount = usandoFirestore
-                              ? carrerasFromFirestore.filter(
-                                  (c) => c.id_hipodromo === hip.id
-                                ).length
-                              : data.carreras.filter(
-                                  (c) => c.id_hipodromo === hip.id
-                                ).length;
-                            return (
-                              <option key={hip.id} value={hip.id}>
-                                {hip.descripcion} ({carrerasCount} carreras)
-                              </option>
-                            );
-                          })}
-                      </select>
-                    </div>
+                    {selectedHipodromo &&
+                      (() => {
+                        const hipodromoInfo =
+                          getHipodromoInfo(selectedHipodromo);
+                        const carrerasCount = carrerasDelHipodromo.length;
+
+                        return (
+                          <div className="bg-gradient-to-r from-fuchsia-900 to-fuchsia-500 rounded-xl p-3 mb-4 shadow-lg shadow-fuchsia-500/30">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <div className="p-1.5 rounded-lg bg-white/20 backdrop-blur-sm flex-shrink-0">
+                                  <TrendingUp className="w-4 h-4 text-white" />
+                                </div>
+                                <h3 className="text-white font-bold text-base md:text-xl truncate">
+                                  {hipodromoInfo?.descripcion || "Hipódromo"}
+                                </h3>
+                              </div>
+                              <div className="px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30 flex-shrink-0">
+                                <span className="text-white font-bold text-sm md:text-base whitespace-nowrap">
+                                  {carrerasCount}{" "}
+                                  {carrerasCount === 1 ? "carrera" : "carreras"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                     {!selectedHipodromo ? (
                       <div className="flex items-center justify-center py-20">
@@ -918,11 +934,10 @@ const RacesList = ({ onSelectRace }) => {
                             <TrendingUp className="w-10 h-10 text-fuchsia-400" />
                           </div>
                           <p className="text-lg font-semibold text-slate-200 mb-2">
-                            Selecciona un hipódromo
+                            No hay carreras disponibles
                           </p>
                           <p className="text-sm text-slate-400">
-                            Elige un hipódromo del menú desplegable para ver sus
-                            carreras
+                            No se encontraron carreras programadas para hoy
                           </p>
                         </div>
                       </div>

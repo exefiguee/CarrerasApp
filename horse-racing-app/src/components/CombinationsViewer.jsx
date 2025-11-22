@@ -9,12 +9,53 @@ const CombinationsViewer = ({
 }) => {
   if (!isOpen) return null;
 
-  // 🎯 Detectar si es selección agrupada
+  // 🎯 Detectar el tipo de selección
   const isGroupedSelection = selectedHorses?.grouped === true;
+  const isMultiRace = selectedHorses?.multiRace === true;
 
   // 🎯 Generar combinaciones según el tipo de apuesta
   const generateCombinations = () => {
     const combinations = [];
+
+    // 🔥 Para MULTI-RACE (DOBLE, TRIPLO, PICK 4, PICK 5)
+    if (isMultiRace || betTypeConfig?.selectionMode === "grouped-races") {
+      const races = betTypeConfig?.races || 2;
+
+      // Obtener arrays de cada carrera (solo caballos válidos)
+      const raceArrays = [];
+      for (let i = 1; i <= races; i++) {
+        const raceHorses = selectedHorses[`race${i}`] || [];
+        // Filtrar solo caballos que SÍ corren
+        const validHorses = raceHorses.filter(
+          (h) => !h.noCorre && !h.scratched
+        );
+        raceArrays.push(validHorses);
+      }
+
+      // Generar producto cartesiano
+      const cartesianProduct = (arrays) => {
+        if (arrays.length === 0) return [[]];
+        const [first, ...rest] = arrays;
+        const restProduct = cartesianProduct(rest);
+        return first.flatMap((item) =>
+          restProduct.map((combo) => [item, ...combo])
+        );
+      };
+
+      const allCombinations = cartesianProduct(raceArrays);
+
+      allCombinations.forEach((combo, index) => {
+        combinations.push({
+          id: index + 1,
+          horses: combo,
+          raceInfo: combo.map(
+            (_, raceIndex) => selectedHorses[`race${raceIndex + 1}Info`]
+          ),
+        });
+      });
+
+      return combinations;
+    }
 
     // Para GRUPOS POR POSICIÓN (EXACTA, IMPERFECTA, TRIFECTA D, CUATRIFECTA D)
     if (
@@ -85,39 +126,6 @@ const CombinationsViewer = ({
       return combinations;
     }
 
-    // Para MULTI-RACE
-    if (betTypeConfig?.selectionMode === "multi-race") {
-      const horses = Array.isArray(selectedHorses) ? selectedHorses : [];
-      const races = betTypeConfig?.races || 2;
-
-      // Generar producto cartesiano para múltiples carreras
-      const generateMultiRaceCombinations = (arr, n) => {
-        if (n === 1) return arr.map((el) => [el]);
-
-        const result = [];
-        const smaller = generateMultiRaceCombinations(arr, n - 1);
-
-        arr.forEach((el) => {
-          smaller.forEach((combo) => {
-            result.push([el, ...combo]);
-          });
-        });
-
-        return result;
-      };
-
-      const allCombos = generateMultiRaceCombinations(horses, races);
-
-      allCombos.forEach((combo, index) => {
-        combinations.push({
-          id: index + 1,
-          horses: combo,
-        });
-      });
-
-      return combinations;
-    }
-
     return [];
   };
 
@@ -170,26 +178,49 @@ const CombinationsViewer = ({
                     </span>
                   </div>
 
-                  <div className="flex-1 flex items-center gap-2 flex-wrap">
-                    {combo.horses.map((horse, index) => (
-                      <div key={index} className="flex items-center gap-1">
-                        <div className="px-3 py-1.5 bg-slate-900/50 border border-slate-700/50 rounded-lg group-hover:border-fuchsia-500/30 transition-colors">
-                          <span className="text-white font-semibold text-sm">
-                            #{horse.number}
-                          </span>
-                        </div>
-                        {index < combo.horses.length - 1 && (
-                          <span className="text-slate-600 font-bold">→</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {combo.horses.map((horse, index) => (
+                        <div key={index} className="flex items-center gap-1">
+                          {/* 🔥 Para multi-race, mostrar info de cada carrera */}
+                          {isMultiRace && combo.raceInfo?.[index] && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-slate-500 font-medium">
+                                C{combo.raceInfo[index].number}:
+                              </span>
+                            </div>
+                          )}
 
-                  {isGroupedSelection && (
-                    <div className="flex-shrink-0 text-xs text-slate-500 font-medium">
-                      {combo.horses.map((h, i) => `${i + 1}°`).join(" → ")}
+                          <div className="px-3 py-1.5 bg-slate-900/50 border border-slate-700/50 rounded-lg group-hover:border-fuchsia-500/30 transition-colors">
+                            <span className="text-white font-semibold text-sm">
+                              #{horse.number}
+                            </span>
+                            {horse.name && (
+                              <span className="ml-1 text-xs text-slate-400">
+                                {horse.name.toUpperCase().length > 20
+                                  ? horse.name.toUpperCase().substring(0, 20) +
+                                    "..."
+                                  : horse.name.toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+
+                          {index < combo.horses.length - 1 && (
+                            <span className="text-slate-600 font-bold">
+                              {isMultiRace ? "×" : "→"}
+                            </span>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  )}
+
+                    {/* Mostrar posiciones para apuestas por posición */}
+                    {isGroupedSelection && !isMultiRace && (
+                      <div className="mt-1 text-xs text-slate-500 font-medium">
+                        {combo.horses.map((h, i) => `${i + 1}°`).join(" → ")}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

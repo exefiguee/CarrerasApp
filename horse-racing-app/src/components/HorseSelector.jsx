@@ -80,8 +80,17 @@ const HorseSelector = ({
         const venue = race.venue || race.descripcion_hipodromo;
         const fecha = race.date || race.fecha_texto;
 
-        console.log("📥 Cargando " + (numRaces - 1) + " carreras siguientes...");
-        console.log("📍 Carrera actual: " + currentRaceNum + " (tipo: " + typeof currentRaceNum + ") en " + venue);
+        console.log(
+          "📥 Cargando " + (numRaces - 1) + " carreras siguientes..."
+        );
+        console.log(
+          "📍 Carrera actual: " +
+            currentRaceNum +
+            " (tipo: " +
+            typeof currentRaceNum +
+            ") en " +
+            venue
+        );
         console.log("📍 Fecha: " + fecha);
 
         const racesToLoad = [];
@@ -93,9 +102,15 @@ const HorseSelector = ({
           console.log("🔍 Buscando carrera siguiente...");
           console.log("   Carrera actual: " + currentRaceNum);
           console.log("   i: " + i);
-          console.log("   nextRaceNum calculado: " + nextRaceNum + " → String: \"" + nextRaceNumStr + "\"");
-          console.log("   Venue: \"" + venue + "\"");
-          console.log("   Fecha: \"" + fecha + "\"");
+          console.log(
+            "   nextRaceNum calculado: " +
+              nextRaceNum +
+              ' → String: "' +
+              nextRaceNumStr +
+              '"'
+          );
+          console.log('   Venue: "' + venue + '"');
+          console.log('   Fecha: "' + fecha + '"');
 
           const q = query(
             collection(db, "carreras1"),
@@ -106,71 +121,93 @@ const HorseSelector = ({
           );
 
           const snapshot = await getDocs(q);
-          
+
           console.log("   Resultados encontrados: " + snapshot.size);
-          
+
           if (snapshot.empty) {
             console.log("   ❌ NO ENCONTRADA con los filtros exactos");
-            console.log("   🔍 Buscando TODAS las carreras de \"" + venue + "\" el \"" + fecha + "\"...");
-            
+            console.log(
+              '   🔍 Buscando TODAS las carreras de "' +
+                venue +
+                '" el "' +
+                fecha +
+                '"...'
+            );
+
             const debugQuery = query(
               collection(db, "carreras1"),
               where("descripcion_hipodromo", "==", venue),
               where("fecha_texto", "==", fecha)
             );
             const debugSnapshot = await getDocs(debugQuery);
-            console.log("   📋 Total carreras encontradas: " + debugSnapshot.size);
-            
-            debugSnapshot.forEach(doc => {
+            console.log(
+              "   📋 Total carreras encontradas: " + debugSnapshot.size
+            );
+
+            debugSnapshot.forEach((doc) => {
               const data = doc.data();
-              console.log("      → Carrera num_carrera=\"" + data.num_carrera + "\" (tipo: " + typeof data.num_carrera + ")");
+              console.log(
+                '      → Carrera num_carrera="' +
+                  data.num_carrera +
+                  '" (tipo: ' +
+                  typeof data.num_carrera +
+                  ")"
+              );
             });
           }
-          
+
           if (!snapshot.empty) {
             const raceData = snapshot.docs[0].data();
             console.log("   ✅ Encontrada carrera " + nextRaceNumStr);
             console.log("   📦 Datos de la carrera:", raceData);
-            
+
             const horsesArray = [];
-            
+
             // 🔥 OPCIÓN 1: Intentar obtener de limitesApuestas (si existe info detallada)
             if (raceData.limitesApuestas) {
               console.log("   🐴 Extrayendo desde 'limitesApuestas'");
-              Object.entries(raceData.limitesApuestas).forEach(([betType, betData]) => {
-                if (betData.caballos) {
-                  Object.entries(betData.caballos).forEach(([key, horseData]) => {
-                    if (key.startsWith('caballo_')) {
-                      const horseNum = parseInt(key.replace('caballo_', ''));
-                      if (!horsesArray.some(h => h.number === horseNum)) {
-                        horsesArray.push({
-                          number: horseNum,
-                          name: horseData.nombre || `Caballo ${horseNum}`,
-                          jockey: horseData.jockey || ''
-                        });
+              Object.entries(raceData.limitesApuestas).forEach(
+                ([betType, betData]) => {
+                  if (betData.caballos) {
+                    Object.entries(betData.caballos).forEach(
+                      ([key, horseData]) => {
+                        if (key.startsWith("caballo_")) {
+                          const horseNum = parseInt(
+                            key.replace("caballo_", "")
+                          );
+                          if (!horsesArray.some((h) => h.number === horseNum)) {
+                            horsesArray.push({
+                              number: horseNum,
+                              name: horseData.nombre || `Caballo ${horseNum}`,
+                              jockey: horseData.jockey || "",
+                            });
+                          }
+                        }
                       }
-                    }
-                  });
+                    );
+                  }
                 }
-              });
+              );
             }
-            
+
             // 🔥 OPCIÓN 2: Si no hay info detallada, usar caballitos (solo números)
             if (horsesArray.length === 0 && raceData.caballitos) {
               console.log("   🐴 Extrayendo desde 'caballitos' (solo números)");
               Object.entries(raceData.caballitos).forEach(([key, value]) => {
-                if (key.startsWith('caballo_') && value === true) {
-                  const horseNum = parseInt(key.replace('caballo_', ''));
+                if (key.startsWith("caballo_")) {
+                  const horseNum = parseInt(key.replace("caballo_", ""));
                   horsesArray.push({
                     number: horseNum,
                     name: `Caballo ${horseNum}`,
-                    jockey: ''
+                    jockey: "",
                   });
                 }
               });
             }
 
-            console.log("   ✅ Total caballos extraídos: " + horsesArray.length);
+            console.log(
+              "   ✅ Total caballos extraídos: " + horsesArray.length
+            );
             console.log("   📋 Caballos:", horsesArray);
             horsesArray.sort((a, b) => a.number - b.number);
 
@@ -178,7 +215,7 @@ const HorseSelector = ({
               ...raceData,
               id: snapshot.docs[0].id,
               horses: horsesArray,
-              raceNumber: raceData.num_carrera
+              raceNumber: raceData.num_carrera,
             });
           } else {
             console.warn("   ⚠️ No se encontró la carrera " + nextRaceNumStr);
@@ -187,15 +224,23 @@ const HorseSelector = ({
 
         if (racesToLoad.length === numRaces - 1) {
           setNextRaces(racesToLoad);
-          console.log("✅ Todas las carreras siguientes cargadas:", racesToLoad);
+          console.log(
+            "✅ Todas las carreras siguientes cargadas:",
+            racesToLoad
+          );
         } else {
           setNextRaces([]);
-          console.warn("❌ No se pudieron cargar todas las " + (numRaces - 1) + " carreras necesarias");
+          console.warn(
+            "❌ No se pudieron cargar todas las " +
+              (numRaces - 1) +
+              " carreras necesarias"
+          );
         }
-        
       } catch (error) {
         console.error("❌ Error cargando carreras siguientes:", error);
-        alert("Error al cargar las carreras siguientes. Por favor, intentá de nuevo.");
+        alert(
+          "Error al cargar las carreras siguientes. Por favor, intentá de nuevo."
+        );
       } finally {
         setLoadingNextRaces(false);
       }
@@ -236,7 +281,12 @@ const HorseSelector = ({
     let total = 1;
 
     for (let i = 1; i <= numRaces; i++) {
-      const count = tempGroupedRaces[`race${i}`]?.length || 0;
+      const allHorses = tempGroupedRaces[`race${i}`] || [];
+      const horsesQueCorren = allHorses.filter(
+        (h) => !h.noCorre && !h.scratched
+      );
+      const count = horsesQueCorren.length;
+
       if (count === 0) return 0;
       total *= count;
     }
@@ -253,21 +303,29 @@ const HorseSelector = ({
 
     return newCombinations <= topeCombinaciones;
   };
-
   const toggleHorse = (horse) => {
+    // 🔥 Definir raceToCheck al inicio para todo el scope
+    const raceToCheck =
+      isGroupedRaces && currentRace > 1 ? nextRaces[currentRace - 2] : race;
+
+    // 🔥 VALIDAR que el caballo esté habilitado ANTES de hacer cualquier cosa
     if (isGroupedRaces) {
-      const raceToCheck = currentRace === 1 ? race : nextRaces[currentRace - 2];
       if (!isHorseEnabled(horse, raceToCheck)) {
         console.log(`⛔ Caballo ${horse.number} no corre en esta carrera`);
+        alert(
+          `⚠️ El caballo #${horse.number} no está corriendo en esta carrera.`
+        );
         return;
       }
     } else {
       if (!isHorseEnabled(horse)) {
         console.log(`⛔ Caballo ${horse.number} no corre`);
+        alert(`⚠️ El caballo #${horse.number} no está corriendo.`);
         return;
       }
     }
 
+    // 🏇 APUESTAS MULTI-CARRERA (DOBLE, TRIPLO, PICK)
     if (isGroupedRaces) {
       const raceKey = `race${currentRace}`;
       const currentGroup = groupedRaces[raceKey] || [];
@@ -276,6 +334,7 @@ const HorseSelector = ({
       );
 
       if (isInCurrentGroup) {
+        // Remover caballo
         const newGroup = currentGroup.filter((h) => h.number !== horse.number);
         setGroupedRaces({
           ...groupedRaces,
@@ -285,6 +344,7 @@ const HorseSelector = ({
           `❌ Caballo #${horse.number} removido de carrera ${currentRace}`
         );
       } else {
+        // Agregar caballo
         if (currentGroup.length >= betTypeConfig.maxHorses) {
           alert(
             `⚠️ Solo puedes seleccionar hasta ${betTypeConfig.maxHorses} caballos por carrera`
@@ -294,7 +354,15 @@ const HorseSelector = ({
 
         const tempGroupedRaces = {
           ...groupedRaces,
-          [raceKey]: [...currentGroup, horse],
+          [raceKey]: [
+            ...currentGroup,
+            {
+              ...horse,
+              // 🔥 FIX: NO marcar como "noCorre" si el caballo está habilitado
+              noCorre: false,
+              scratched: false,
+            },
+          ],
         };
 
         const newCombinations =
@@ -325,6 +393,7 @@ const HorseSelector = ({
       return;
     }
 
+    // 🎯 APUESTAS AGRUPADAS POR POSICIÓN (EXACTA, IMPERFECTA, TRIFECTA D, CUATRIFECTA D)
     if (isGroupedPositions) {
       const positionKey = `position${currentPosition}`;
       const currentGroup = groupedPositions[positionKey] || [];
@@ -354,6 +423,7 @@ const HorseSelector = ({
       );
 
       if (isInCurrentGroup) {
+        // Remover caballo
         const newGroup = currentGroup.filter((h) => h.number !== horse.number);
         setGroupedPositions({
           ...groupedPositions,
@@ -363,6 +433,7 @@ const HorseSelector = ({
           `❌ Caballo #${horse.number} removido de posición ${currentPosition}`
         );
       } else {
+        // Agregar caballo
         if (currentGroupCount >= maxAllowedInPosition) {
           alert(
             `⚠️ Solo puedes seleccionar ${maxAllowedInPosition} caballo(s) en ${currentPosition}° puesto cuando tienes ${group1Count} en 1° puesto`
@@ -403,6 +474,7 @@ const HorseSelector = ({
       return;
     }
 
+    // 🎯 APUESTAS DIRECTAS ORDENADAS (TRIFECTA D, CUATRIFECTA D - modo directo)
     if (isOrderedDirect) {
       const newSelection = [...selectedHorses];
       const positionIndex = currentPosition - 1;
@@ -419,6 +491,7 @@ const HorseSelector = ({
       return;
     }
 
+    // 🎯 APUESTAS SIMPLES Y TIRA
     if (isSimple || betTypeConfig?.type === "tira") {
       if (selectedHorses.some((h) => h.number === horse.number)) {
         onSelect([]);
@@ -430,16 +503,19 @@ const HorseSelector = ({
       return;
     }
 
+    // 🎯 APUESTAS CON COMBINACIONES ORDENADAS (TRIFECTA C, CUATRIFECTA C)
     if (isOrderedCombination) {
       const isSelected = selectedHorses.some((h) => h.number === horse.number);
 
       if (isSelected) {
+        // Remover caballo
         const newSelection = selectedHorses.filter(
           (h) => h.number !== horse.number
         );
         onSelect(newSelection);
         console.log(`❌ Caballo #${horse.number} removido`);
       } else {
+        // Agregar caballo
         if (selectedHorses.length >= betTypeConfig.maxHorses) {
           alert(
             `⚠️ Solo puedes seleccionar hasta ${betTypeConfig.maxHorses} caballos`
@@ -481,6 +557,7 @@ const HorseSelector = ({
       return;
     }
 
+    // 🎯 APUESTAS GENERALES (fallback)
     const isSelected = selectedHorses.some((h) => h.number === horse.number);
 
     if (isSelected) {
@@ -499,7 +576,6 @@ const HorseSelector = ({
       onSelect(newSelection);
     }
   };
-
   const calculateCombinations = () => {
     if (isGroupedRaces) {
       return calculateGroupedRacesCombinations(groupedRaces);
@@ -577,7 +653,11 @@ const HorseSelector = ({
 
       return `Selecciona de 1 a ${
         betTypeConfig?.maxHorses || 10
-      } caballos ganadores para ${racesText} consecutivas (Carreras ${raceNumbers.join(", ")}). Se generan combinaciones: ${raceNumbers.map((r, i) => `C${i + 1}`).join(" × ")}`;
+      } caballos ganadores para ${racesText} consecutivas (Carreras ${raceNumbers.join(
+        ", "
+      )}). Se generan combinaciones: ${raceNumbers
+        .map((r, i) => `C${i + 1}`)
+        .join(" × ")}`;
     }
 
     if (isGroupedPositions) {
@@ -620,16 +700,37 @@ const HorseSelector = ({
       for (let i = 1; i <= numRaces; i++) {
         const group = groupedRaces[`race${i}`] || [];
         if (group.length === 0) {
-          const raceNum = i === 1 
-            ? parseInt(race.raceNumber || race.num_carrera)
-            : parseInt(race.raceNumber || race.num_carrera) + (i - 1);
-          
+          const raceNum =
+            i === 1
+              ? parseInt(race.raceNumber || race.num_carrera)
+              : parseInt(race.raceNumber || race.num_carrera) + (i - 1);
+
           alert(
             `⚠️ Debes seleccionar al menos 1 caballo en la Carrera ${raceNum}`
           );
           return;
         }
         groups[`race${i}`] = group;
+
+        // 🔥 Agregar información de cada carrera
+        if (i === 1) {
+          groups[`race${i}Info`] = {
+            number: race.raceNumber || race.num_carrera,
+            venue: race.venue || race.descripcion_hipodromo,
+            date: race.date || race.fecha_texto,
+            time: race.time || race.hora,
+          };
+        } else {
+          const nextRaceData = nextRaces[i - 2];
+          if (nextRaceData) {
+            groups[`race${i}Info`] = {
+              number: nextRaceData.num_carrera,
+              venue: nextRaceData.descripcion_hipodromo,
+              date: nextRaceData.fecha_texto,
+              time: nextRaceData.hora,
+            };
+          }
+        }
       }
 
       const totalCombinations = calculateGroupedRacesCombinations(groupedRaces);
@@ -741,7 +842,11 @@ const HorseSelector = ({
     setCurrentRace(raceNum);
   };
 
-  if (isGroupedRaces && !loadingNextRaces && nextRaces.length < (betTypeConfig?.races || 2) - 1) {
+  if (
+    isGroupedRaces &&
+    !loadingNextRaces &&
+    nextRaces.length < (betTypeConfig?.races || 2) - 1
+  ) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <AlertCircle className="w-16 h-16 text-amber-500 mb-4" />
@@ -749,8 +854,10 @@ const HorseSelector = ({
           No se pueden realizar apuestas de tipo {betTypeConfig?.label}
         </p>
         <p className="text-slate-400 text-center text-sm max-w-md">
-          Para apostar {betTypeConfig?.label}, se necesitan {betTypeConfig?.races} carreras consecutivas, 
-          pero solo hay {nextRaces.length + 1} carrera(s) disponible(s) en este hipódromo para esta fecha.
+          Para apostar {betTypeConfig?.label}, se necesitan{" "}
+          {betTypeConfig?.races} carreras consecutivas, pero solo hay{" "}
+          {nextRaces.length + 1} carrera(s) disponible(s) en este hipódromo para
+          esta fecha.
         </p>
         <button
           onClick={onBack}
@@ -1030,8 +1137,10 @@ const HorseSelector = ({
                   {(() => {
                     const numRaces = betTypeConfig?.races || 2;
                     const parts = [];
-                    const currentRaceNum = parseInt(race.raceNumber || race.num_carrera);
-                    
+                    const currentRaceNum = parseInt(
+                      race.raceNumber || race.num_carrera
+                    );
+
                     for (let i = 1; i <= numRaces; i++) {
                       const raceNum = currentRaceNum + (i - 1);
                       parts.push(
@@ -1107,13 +1216,29 @@ const HorseSelector = ({
             </div>
           )}
       </div>
-
       <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
         {(() => {
-          const horsesToShow =
-            isGroupedRaces && currentRace > 1
-              ? nextRaces[currentRace - 2]?.horses || []
-              : horses;
+          // 🔥 SIEMPRE mostrar TODOS los caballos, no solo los que corren
+          let horsesToShow = [];
+
+          if (isGroupedRaces && currentRace > 1) {
+            // Para carreras siguientes, primero intentamos obtener de nextRaces
+            const nextRaceData = nextRaces[currentRace - 2];
+
+            if (nextRaceData?.horses && nextRaceData.horses.length > 0) {
+              horsesToShow = nextRaceData.horses;
+            } else {
+              // Si no hay info detallada, crear lista básica de caballos
+              horsesToShow = horses.map((h) => ({
+                number: h.number,
+                name: h.name || `Caballo ${h.number}`,
+                jockey: h.jockey || "",
+              }));
+            }
+          } else {
+            // Carrera actual
+            horsesToShow = horses;
+          }
 
           if (horsesToShow.length === 0) {
             return (
@@ -1127,10 +1252,11 @@ const HorseSelector = ({
           }
 
           return horsesToShow.map((horse) => {
-            const raceToCheck = isGroupedRaces && currentRace > 1 
-              ? nextRaces[currentRace - 2] 
-              : race;
-            
+            const raceToCheck =
+              isGroupedRaces && currentRace > 1
+                ? nextRaces[currentRace - 2]
+                : race;
+
             const isEnabled = isHorseEnabled(horse, raceToCheck);
 
             let isSelected = false;
@@ -1140,9 +1266,8 @@ const HorseSelector = ({
             if (isGroupedRaces) {
               const raceKey = `race${currentRace}`;
               isSelected =
-                groupedRaces[raceKey]?.some(
-                  (h) => h.number === horse.number
-                ) || false;
+                groupedRaces[raceKey]?.some((h) => h.number === horse.number) ||
+                false;
               if (isSelected) selectedInRace = currentRace;
             } else if (isGroupedPositions) {
               const positions = betTypeConfig?.positions || 2;
@@ -1246,11 +1371,11 @@ const HorseSelector = ({
                       )}
                       {isGroupedRaces && selectedInRace && (
                         <span className="px-3 py-1 bg-emerald-500 text-white rounded-lg text-sm font-bold">
-                          Carrera {
-                            selectedInRace === 1 
-                              ? race.raceNumber || race.num_carrera
-                              : parseInt(race.raceNumber || race.num_carrera) + (selectedInRace - 1)
-                          }
+                          Carrera{" "}
+                          {selectedInRace === 1
+                            ? race.raceNumber || race.num_carrera
+                            : parseInt(race.raceNumber || race.num_carrera) +
+                              (selectedInRace - 1)}
                         </span>
                       )}
                       {isOrderedDirect && (
@@ -1283,11 +1408,11 @@ const HorseSelector = ({
 
                   {isGroupedRaces && !isSelected && isEnabled && (
                     <div className="px-3 py-1 bg-slate-700/50 text-slate-400 rounded-lg text-xs">
-                      Para C{
-                        currentRace === 1 
-                          ? race.raceNumber || race.num_carrera
-                          : parseInt(race.raceNumber || race.num_carrera) + (currentRace - 1)
-                      }
+                      Para C
+                      {currentRace === 1
+                        ? race.raceNumber || race.num_carrera
+                        : parseInt(race.raceNumber || race.num_carrera) +
+                          (currentRace - 1)}
                     </div>
                   )}
                 </div>

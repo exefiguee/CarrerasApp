@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sin Transmisiones</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, sans-serif;
+            position: relative;
+        }
+
+        body::before,
+        body::after {
+            content: '';
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(217, 70, 239, 0.4) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::before {
+            top: -150px;
+            left: -150px;
+        }
+
+        body::after {
+            bottom: -150px;
+            right: -150px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .image-wrapper {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .image-wrapper img {
+            width: 100%;
+            height: auto;
+            max-height: 60vh;
+            object-fit: contain;
+            display: block;
+            filter: brightness(0) saturate(100%) invert(44%) sepia(94%) saturate(4217%) hue-rotate(295deg) brightness(98%) contrast(101%);
+        }
+
+        .message {
+            color: #fff;
+            font-style: italic;
+            text-align: center;
+            line-height: 1.2;
+            font-size: clamp(1.5rem, 6vw, 4rem);
+            padding: 0 1rem;
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                gap: 1rem;
+            }
+
+            .image-wrapper img {
+                max-height: 50vh;
+            }
+        }
+
+        @media (max-height: 600px) {
+            .image-wrapper img {
+                max-height: 40vh;
+            }
+
+            .message {
+                font-size: clamp(1.2rem, 5vw, 2.5rem);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="image-wrapper">
+            <img 
+                src="https://xwdc.net/assets/gif-web-BSwtjEog.gif" 
+                alt="Sin transmisiones"
+            >
+        </div>
+        <p class="message">
+            Aún no hay transmisiones en vivo
+        </p>
+    </div>
+</body>
+
+</html>
