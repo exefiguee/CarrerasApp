@@ -505,7 +505,11 @@ const RacesList = ({ onSelectRace }) => {
         apuestaMaxima: 50000,
         topedeconbinaciones: 60,
       },
-      TRIFECTAD1: { apuestaMinima: 200, apuestaMaxima: 100000 },
+      TRIFECTAD1: {
+        apuestaMinima: 200,
+        apuestaMaxima: 100000,
+        topedeconbinaciones: 100,
+      },
       CUATRIFECTAD1: {
         apuestaMinima: 200,
         apuestaMaxima: 150000,

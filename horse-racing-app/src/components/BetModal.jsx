@@ -187,43 +187,49 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
         howItWorks:
           "Selecciona 4 o más caballos. Se generan todas las permutaciones de 4 caballos",
       },
+
+      ///estos no van por posciion van por carrera variable race
       DOBLE: {
         maxHorses: 10,
         minHorses: 1,
-        type: "multiple-races",
-        races: 2,
-        selectionMode: "multi-race",
+        type: "combinada-por-posicion",
+
+        //cambiar por carreras despues
+
+        race: 2,
+        positions: 2,
+        selectionMode: "grouped-positions",
         description: "Ganadores de 2 carreras consecutivas",
         howItWorks:
           "Selecciona caballos ganadores en esta carrera y la siguiente",
-        requiresNextRace: true,
+        // requiresNextRace: false,
       },
       TRIPLO: {
         maxHorses: 10,
         minHorses: 1,
-        type: "multiple-races",
-        races: 3,
-        selectionMode: "multi-race",
+        type: "combinada-por-posicion",
+        positions: 3,
+        selectionMode: "grouped-positions",
         description: "Ganadores de 3 carreras consecutivas",
-        requiresNextRace: true,
+        // requiresNextRace: false,
       },
       "PICK 4": {
         maxHorses: 10,
         minHorses: 1,
-        type: "multiple-races",
-        races: 4,
-        selectionMode: "multi-race",
+        type: "combinada-por-posicion",
+        positions: 4,
+        selectionMode: "grouped-positions",
         description: "Ganadores de 4 carreras consecutivas",
-        requiresNextRace: true,
+        // requiresNextRace: false,
       },
       "PICK 5": {
         maxHorses: 10,
         minHorses: 1,
-        type: "multiple-races",
-        races: 5,
-        selectionMode: "multi-race",
+        type: "combinada-por-posicion",
+        positions: 5,
+        selectionMode: "grouped-positions",
         description: "Ganadores de 5 carreras consecutivas",
-        requiresNextRace: true,
+        // requiresNextRace: false,
       },
     };
 

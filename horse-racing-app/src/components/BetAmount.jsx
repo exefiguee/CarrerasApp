@@ -5,7 +5,9 @@ import {
   AlertCircle,
   TrendingUp,
   Check,
+  Eye,
 } from "lucide-react";
+import CombinationsViewer from "./CombinationsViewer";
 
 const BetAmount = ({
   betType,
@@ -23,6 +25,7 @@ const BetAmount = ({
   betTypeConfig,
 }) => {
   const [customAmount, setCustomAmount] = useState("");
+  const [showCombinations, setShowCombinations] = useState(false);
 
   console.log("💰 BetAmount - Config:", {
     betType,
@@ -35,7 +38,14 @@ const BetAmount = ({
   // 🎯 Detectar si selectedHorses es un objeto agrupado o un array
   const isGroupedSelection = selectedHorses?.grouped === true;
   const horsesArray = isGroupedSelection
-    ? [...(selectedHorses.position1 || []), ...(selectedHorses.position2 || [])]
+    ? (() => {
+        const positions = betTypeConfig?.positions || 2;
+        const allHorses = [];
+        for (let i = 1; i <= positions; i++) {
+          allHorses.push(...(selectedHorses[`position${i}`] || []));
+        }
+        return allHorses;
+      })()
     : Array.isArray(selectedHorses)
     ? selectedHorses
     : [];
@@ -44,11 +54,23 @@ const BetAmount = ({
   const calculateCombinations = () => {
     const selectionMode = betTypeConfig?.selectionMode;
 
-    // Para grupos por posición (EXACTA, IMPERFECTA)
+    // 🔥 Para grupos por posición (EXACTA, IMPERFECTA, TRIFECTA D, CUATRIFECTA D)
     if (selectionMode === "grouped-positions" && isGroupedSelection) {
-      const group1 = selectedHorses.position1?.length || 0;
-      const group2 = selectedHorses.position2?.length || 0;
-      return group1 * group2;
+      const positions = betTypeConfig?.positions || 2;
+      let total = 1;
+
+      // Multiplicar TODAS las posiciones
+      for (let i = 1; i <= positions; i++) {
+        const count = selectedHorses[`position${i}`]?.length || 0;
+        if (count === 0) return 0;
+        total *= count;
+      }
+
+      console.log(
+        `💡 Combinaciones calculadas (${positions} posiciones):`,
+        total
+      );
+      return total;
     }
 
     const n = horsesArray.length;
@@ -116,11 +138,30 @@ const BetAmount = ({
 
   const totalAmount = calculateTotalAmount(amount);
 
+  // 🔥 NUEVO: Validar tope de combinaciones
+  const isWithinCombinationLimit = () => {
+    const betTypeKey = betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
+    const limites = raceData?.limitesApuestas?.[betTypeKey];
+    const topeCombinaciones = limites?.topedeconbinaciones;
+
+    if (!topeCombinaciones) return true;
+
+    if (combinaciones > topeCombinaciones) {
+      console.log(
+        `⚠️ Límite de combinaciones superado: ${combinaciones} > ${topeCombinaciones}`
+      );
+      return false;
+    }
+
+    return true;
+  };
+
   // 🎯 Validaciones
   const isAmountValid = () => {
     if (amount < minBetAmount) return false;
     if (amount > maxBetAmount) return false;
     if (totalAmount > userSaldo) return false;
+    if (!isWithinCombinationLimit()) return false; // 🔥 NUEVO
     return true;
   };
 
@@ -136,6 +177,15 @@ const BetAmount = ({
         "es-AR"
       )}`;
     }
+
+    // 🔥 NUEVO: Mensaje para tope de combinaciones
+    if (!isWithinCombinationLimit()) {
+      const betTypeKey = betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
+      const limites = raceData?.limitesApuestas?.[betTypeKey];
+      const topeCombinaciones = limites?.topedeconbinaciones;
+      return `Esta apuesta supera el límite de ${topeCombinaciones} combinaciones permitidas. Actualmente tenés ${combinaciones} combinaciones.`;
+    }
+
     return "";
   };
 
@@ -175,10 +225,8 @@ const BetAmount = ({
   };
 
   // 🎯 Función para renderizar los caballos seleccionados
-  // 🎯 Función para renderizar los caballos seleccionados
   const renderSelectedHorses = () => {
     if (isGroupedSelection) {
-      // Obtener el número de posiciones según el tipo de apuesta
       const positions = betTypeConfig?.positions || 2;
 
       return (
@@ -214,6 +262,7 @@ const BetAmount = ({
       </div>
     );
   };
+
   return (
     <div className="space-y-4">
       {/* Resumen de la apuesta */}
@@ -248,9 +297,16 @@ const BetAmount = ({
             <div className="pt-2 border-t border-slate-700/50 text-xs text-slate-400">
               <p>
                 💡 Se generan {combinaciones} combinaciones:
-                {` ${selectedHorses.position1?.length || 0} (1°) × ${
-                  selectedHorses.position2?.length || 0
-                } (2°)`}
+                {` ${(() => {
+                  const positions = betTypeConfig?.positions || 2;
+                  const counts = [];
+                  for (let i = 1; i <= positions; i++) {
+                    counts.push(
+                      `${selectedHorses[`position${i}`]?.length || 0} (${i}°)`
+                    );
+                  }
+                  return counts.join(" × ");
+                })()}`}
               </p>
             </div>
           )}
@@ -259,10 +315,55 @@ const BetAmount = ({
             <span className="text-slate-400">
               {combinaciones === 1 ? "Apuesta única:" : "Combinaciones:"}
             </span>
-            <span className="text-amber-300 font-bold text-lg">
-              {combinaciones}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-amber-300 font-bold text-lg">
+                {combinaciones}
+              </span>
+              {combinaciones > 1 && (
+                <button
+                  onClick={() => setShowCombinations(true)}
+                  className="px-2 py-1 bg-fuchsia-500/20 hover:bg-fuchsia-500/30 border border-fuchsia-500/30 hover:border-fuchsia-500/50 rounded-lg text-fuchsia-300 text-xs font-semibold transition-all flex items-center gap-1">
+                  <Eye className="w-3.5 h-3.5" />
+                  Ver
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* 🔥 NUEVO: Información de tope de combinaciones */}
+          {(() => {
+            const betTypeKey =
+              betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
+            const limites = raceData?.limitesApuestas?.[betTypeKey];
+            const topeCombinaciones = limites?.topedeconbinaciones;
+
+            if (topeCombinaciones && combinaciones > 0) {
+              const percentage = (combinaciones / topeCombinaciones) * 100;
+              const isNearLimit = percentage > 80;
+              const isOverLimit = combinaciones > topeCombinaciones;
+
+              return (
+                <div
+                  className={`pt-2 border-t border-slate-700/50 text-xs ${
+                    isOverLimit
+                      ? "text-red-400"
+                      : isNearLimit
+                      ? "text-amber-400"
+                      : "text-slate-400"
+                  }`}>
+                  <p className="flex items-center gap-2">
+                    {isOverLimit ? "🚫" : isNearLimit ? "⚠️" : "💡"}
+                    <span>
+                      Límite: {combinaciones} / {topeCombinaciones}
+                      {isOverLimit && " - ¡Superado!"}
+                      {isNearLimit && !isOverLimit && " - Cerca del límite"}
+                    </span>
+                  </p>
+                </div>
+              );
+            }
+            return null;
+          })()}
         </div>
       </div>
 
@@ -398,6 +499,14 @@ const BetAmount = ({
           Confirmar Apuesta
         </button>
       </div>
+
+      {/* Modal de Combinaciones */}
+      <CombinationsViewer
+        selectedHorses={selectedHorses}
+        betTypeConfig={betTypeConfig}
+        isOpen={showCombinations}
+        onClose={() => setShowCombinations(false)}
+      />
     </div>
   );
 };

@@ -5,16 +5,13 @@ const HorseSelector = ({
   horses,
   betType,
   betTypeConfig,
-  selectedHorses = [], // ✅ Valor por defecto
+  selectedHorses = [],
   onSelect,
   onBack,
   onNext,
   race,
 }) => {
-  // 🎯 Estado para selección por posiciones (TRIFECTA D, CUATRIFECTA D)
   const [currentPosition, setCurrentPosition] = useState(1);
-
-  // 🎯 Estado para grupos por posición (EXACTA, IMPERFECTA, TRIFECTA D, CUATRIFECTA D)
   const [groupedPositions, setGroupedPositions] = useState({
     position1: [],
     position2: [],
@@ -53,15 +50,50 @@ const HorseSelector = ({
   // 🎯 Determinar el modo de selección
   const selectionMode = betTypeConfig?.selectionMode || "single";
   const isSimple = selectionMode === "single";
-  const isOrderedDirect = selectionMode === "ordered-direct"; // YA NO SE USA
-  const isGroupedPositions = selectionMode === "grouped-positions"; // EXACTA, IMPERFECTA, TRIFECTA D, CUATRIFECTA D
-  const isOrderedCombination = selectionMode === "ordered-combination"; // TRIFECTA C, CUATRIFECTA C
+  const isOrderedDirect = selectionMode === "ordered-direct";
+  const isGroupedPositions = selectionMode === "grouped-positions";
+  const isOrderedCombination = selectionMode === "ordered-combination";
   const isMultiRace = selectionMode === "multi-race";
 
   // 🔥 Verificar si un caballo está habilitado
   const isHorseEnabled = (horse) => {
     const key = `caballo_${horse.number}`;
     return race?.caballitos?.[key] === true;
+  };
+
+  // 🔥 NUEVO: Función auxiliar para calcular factorial
+  const factorial = (n) => {
+    if (n <= 1) return 1;
+    let result = 1;
+    for (let i = 2; i <= n; i++) {
+      result *= i;
+    }
+    return result;
+  };
+
+  // 🔥 NUEVO: Calcular combinaciones con grupos por posición
+  const calculateGroupedCombinations = (tempGroupedPositions) => {
+    const positions = betTypeConfig?.positions || 2;
+    let total = 1;
+
+    for (let i = 1; i <= positions; i++) {
+      const count = tempGroupedPositions[`position${i}`]?.length || 0;
+      if (count === 0) return 0;
+      total *= count;
+    }
+
+    return total;
+  };
+
+  // 🔥 NUEVO: Validar tope de combinaciones
+  const validateCombinationLimit = (newCombinations) => {
+    const betTypeKey = betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
+    const limites = race?.limitesApuestas?.[betTypeKey];
+    const topeCombinaciones = limites?.topedeconbinaciones;
+
+    if (!topeCombinaciones) return true;
+
+    return newCombinations <= topeCombinaciones;
   };
 
   // 🎯 Toggle caballo según el tipo de apuesta
@@ -75,13 +107,10 @@ const HorseSelector = ({
     if (isGroupedPositions) {
       const positionKey = `position${currentPosition}`;
       const currentGroup = groupedPositions[positionKey] || [];
-
       const group1Count = groupedPositions.position1?.length || 0;
-
-      // 🎯 Determinar el número total de posiciones
       const totalPositions = betTypeConfig?.positions || 2;
 
-      // 🎯 Solo aplicar restricción de "no repetir" si group1 tiene exactamente 1 caballo
+      // Restricción de "no repetir" si group1 tiene exactamente 1 caballo
       if (group1Count === 1) {
         const otherPositions = Object.keys(groupedPositions).filter(
           (key) => key !== positionKey
@@ -122,13 +151,35 @@ const HorseSelector = ({
           return;
         }
 
-        const newGroup = [...currentGroup, horse];
-        setGroupedPositions({
+        // 🔥 NUEVO: Validar tope de combinaciones ANTES de agregar
+        const tempGroupedPositions = {
           ...groupedPositions,
-          [positionKey]: newGroup,
-        });
+          [positionKey]: [...currentGroup, horse],
+        };
+
+        const newCombinations =
+          calculateGroupedCombinations(tempGroupedPositions);
+
+        if (!validateCombinationLimit(newCombinations)) {
+          const betTypeKey =
+            betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
+          const limites = race?.limitesApuestas?.[betTypeKey];
+          const topeCombinaciones = limites?.topedeconbinaciones;
+
+          alert(
+            `🚫 No puedes agregar este caballo.\n\n` +
+              `Se superaría el límite de ${topeCombinaciones} combinaciones permitidas.\n` +
+              `Combinaciones actuales: ${calculateGroupedCombinations(
+                groupedPositions
+              )}\n` +
+              `Si agregas este caballo: ${newCombinations} combinaciones`
+          );
+          return;
+        }
+
+        setGroupedPositions(tempGroupedPositions);
         console.log(
-          `✅ Caballo #${horse.number} agregado a posición ${currentPosition}`
+          `✅ Caballo #${horse.number} agregado a posición ${currentPosition} (${newCombinations} combinaciones)`
         );
       }
       return;
@@ -182,8 +233,39 @@ const HorseSelector = ({
         }
 
         const newSelection = [...selectedHorses, horse];
+
+        // 🔥 NUEVO: Calcular combinaciones y validar tope
+        let newCombinations = 1;
+        const n = newSelection.length;
+
+        if (isOrderedCombination) {
+          const positions = betTypeConfig?.positions || 3;
+          if (n >= positions) {
+            // Permutaciones: P(n,r) = n! / (n-r)!
+            newCombinations = factorial(n) / factorial(n - positions);
+          }
+        } else if (isMultiRace) {
+          newCombinations = Math.pow(n, betTypeConfig?.races || 1);
+        }
+
+        if (!validateCombinationLimit(newCombinations)) {
+          const betTypeKey =
+            betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
+          const limites = race?.limitesApuestas?.[betTypeKey];
+          const topeCombinaciones = limites?.topedeconbinaciones;
+
+          alert(
+            `🚫 No puedes seleccionar este caballo.\n\n` +
+              `Se superaría el límite de ${topeCombinaciones} combinaciones.\n` +
+              `Si agregas este caballo tendrías: ${newCombinations} combinaciones`
+          );
+          return;
+        }
+
         onSelect(newSelection);
-        console.log(`✅ Caballo #${horse.number} agregado`);
+        console.log(
+          `✅ Caballo #${horse.number} agregado (${newCombinations} combinaciones)`
+        );
       }
       return;
     }
@@ -212,16 +294,7 @@ const HorseSelector = ({
   const calculateCombinations = () => {
     // Para grupos por posición (EXACTA, IMPERFECTA, TRIFECTA D, CUATRIFECTA D)
     if (isGroupedPositions) {
-      const positions = betTypeConfig?.positions || 2;
-      let total = 1;
-
-      for (let i = 1; i <= positions; i++) {
-        const count = groupedPositions[`position${i}`]?.length || 0;
-        if (count === 0) return 0;
-        total *= count;
-      }
-
-      return total;
+      return calculateGroupedCombinations(groupedPositions);
     }
 
     // Asegurar que selectedHorses sea un array
@@ -229,7 +302,6 @@ const HorseSelector = ({
     const n = horsesArray.length;
 
     if (n === 0) return 0;
-
     if (isSimple) return 1;
     if (betTypeConfig?.type === "tira") return 3;
     if (selectionMode === "ordered-direct") return 1;
@@ -237,8 +309,6 @@ const HorseSelector = ({
     if (selectionMode === "ordered-combination") {
       const positions = betTypeConfig?.positions || 3;
       if (n < positions) return 0;
-
-      // Permutaciones: P(n,r) = n! / (n-r)!
       return factorial(n) / factorial(n - positions);
     }
 
@@ -249,16 +319,30 @@ const HorseSelector = ({
     return 1;
   };
 
-  const factorial = (n) => {
-    if (n <= 1) return 1;
-    let result = 1;
-    for (let i = 2; i <= n; i++) {
-      result *= i;
-    }
-    return result;
+  const combinaciones = calculateCombinations();
+
+  // 🔥 NUEVO: Obtener información del tope de combinaciones
+  const getCombinationLimitInfo = () => {
+    const betTypeKey = betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
+    const limites = race?.limitesApuestas?.[betTypeKey];
+    const topeCombinaciones = limites?.topedeconbinaciones;
+
+    if (!topeCombinaciones || combinaciones === 0) return null;
+
+    const percentage = (combinaciones / topeCombinaciones) * 100;
+    const isNearLimit = percentage > 80;
+    const isOverLimit = combinaciones > topeCombinaciones;
+
+    return {
+      current: combinaciones,
+      max: topeCombinaciones,
+      percentage,
+      isNearLimit,
+      isOverLimit,
+    };
   };
 
-  const combinaciones = calculateCombinations();
+  const limitInfo = getCombinationLimitInfo();
 
   // 🎯 Texto de instrucciones según el tipo de apuesta
   const getInstructions = () => {
@@ -328,6 +412,19 @@ const HorseSelector = ({
         groups[`position${i}`] = group;
       }
 
+      // 🔥 NUEVO: Validar tope antes de continuar
+      const totalCombinations = calculateGroupedCombinations(groupedPositions);
+      if (!validateCombinationLimit(totalCombinations)) {
+        const betTypeKey = betTypeConfig?.originalKey?.replace(/\s/g, "") + "1";
+        const limites = race?.limitesApuestas?.[betTypeKey];
+        const topeCombinaciones = limites?.topedeconbinaciones;
+
+        alert(
+          `🚫 No puedes continuar.\n\nSuperaste el límite de ${topeCombinaciones} combinaciones.\nActualmente tienes: ${totalCombinations} combinaciones`
+        );
+        return;
+      }
+
       console.log("➡️ Continuando con grupos:", groups);
       onNext({ grouped: true, ...groups });
       return;
@@ -363,6 +460,9 @@ const HorseSelector = ({
         const count = groupedPositions[`position${i}`]?.length || 0;
         if (count < 1) return false;
       }
+      // 🔥 NUEVO: Validar que no supere el tope
+      const totalCombinations = calculateGroupedCombinations(groupedPositions);
+      if (!validateCombinationLimit(totalCombinations)) return false;
       return true;
     }
 
@@ -490,10 +590,44 @@ const HorseSelector = ({
                     ? "Apuesta directa:"
                     : "Combinaciones generadas:"}
                 </span>
-                <span className="text-amber-300 font-bold text-lg">
+                <span
+                  className={`font-bold text-lg ${
+                    limitInfo?.isOverLimit
+                      ? "text-red-400"
+                      : limitInfo?.isNearLimit
+                      ? "text-amber-300"
+                      : "text-amber-300"
+                  }`}>
                   {combinaciones}
                 </span>
               </div>
+
+              {/* 🔥 NUEVO: Mostrar información del tope de combinaciones */}
+              {limitInfo && (
+                <div
+                  className={`pt-2 border-t border-slate-700/50 text-xs ${
+                    limitInfo.isOverLimit
+                      ? "text-red-400"
+                      : limitInfo.isNearLimit
+                      ? "text-amber-400"
+                      : "text-slate-400"
+                  }`}>
+                  <p className="flex items-center gap-2">
+                    {limitInfo.isOverLimit
+                      ? "🚫"
+                      : limitInfo.isNearLimit
+                      ? "⚠️"
+                      : "💡"}
+                    <span>
+                      Límite: {limitInfo.current} / {limitInfo.max}
+                      {limitInfo.isOverLimit && " - ¡Superado!"}
+                      {limitInfo.isNearLimit &&
+                        !limitInfo.isOverLimit &&
+                        " - Cerca del límite"}
+                    </span>
+                  </p>
+                </div>
+              )}
 
               {betTypeConfig.type === "tira" && (
                 <div className="text-xs text-slate-400 space-y-1 mt-2">
@@ -637,7 +771,6 @@ const HorseSelector = ({
               }
             }
           } else {
-            // Asegurar que selectedHorses sea un array antes de usar métodos de array
             const horsesArray = Array.isArray(selectedHorses)
               ? selectedHorses
               : [];
@@ -651,7 +784,6 @@ const HorseSelector = ({
               : horsesArray.some((h) => h.number === horse.number);
           }
 
-          // Usar array seguro para findIndex
           const horsesArray = Array.isArray(selectedHorses)
             ? selectedHorses
             : [];
@@ -659,7 +791,6 @@ const HorseSelector = ({
             (h) => h.number === horse.number
           );
 
-          // Usar array seguro para verificar límite
           const horsesArrayForLimit = Array.isArray(selectedHorses)
             ? selectedHorses
             : [];
