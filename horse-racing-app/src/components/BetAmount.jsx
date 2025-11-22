@@ -1,5 +1,11 @@
-import { useState, useEffect } from "react";
-import { ChevronLeft, DollarSign, AlertCircle, TrendingUp, Check } from "lucide-react";
+import { useState } from "react";
+import {
+  ChevronLeft,
+  DollarSign,
+  AlertCircle,
+  TrendingUp,
+  Check,
+} from "lucide-react";
 
 const BetAmount = ({
   betType,
@@ -20,30 +26,35 @@ const BetAmount = ({
 
   console.log("💰 BetAmount - Config:", {
     betType,
-    selectedHorses: selectedHorses.length,
+    selectedHorses,
     minBetAmount,
     maxBetAmount,
     userSaldo,
   });
 
-  // 🎯 Calcular combinaciones (mismo cálculo que en HorseSelector)
+  // 🎯 Detectar si selectedHorses es un objeto agrupado o un array
+  const isGroupedSelection = selectedHorses?.grouped === true;
+  const horsesArray = isGroupedSelection
+    ? [...(selectedHorses.position1 || []), ...(selectedHorses.position2 || [])]
+    : Array.isArray(selectedHorses)
+    ? selectedHorses
+    : [];
+
+  // 🎯 Calcular combinaciones
   const calculateCombinations = () => {
     const selectionMode = betTypeConfig?.selectionMode;
 
-
-     if (selectionMode === "grouped-positions" && selectedHorses.position1 && selectedHorses.position2) {
-      const group1 = selectedHorses.position1.length || 0;
-      const group2 = selectedHorses.position2.length || 0;
+    // Para grupos por posición (EXACTA, IMPERFECTA)
+    if (selectionMode === "grouped-positions" && isGroupedSelection) {
+      const group1 = selectedHorses.position1?.length || 0;
+      const group2 = selectedHorses.position2?.length || 0;
       return group1 * group2;
     }
 
-   const n = Array.isArray(selectedHorses) ? selectedHorses.length : 0;
-
-
+    const n = horsesArray.length;
     if (n === 0) return 0;
 
     // Simple (1 caballo = 1 apuesta)
-    // Incluye: GANADOR, SEGUNDO, TERCERO, EXACTA, IMPERFECTA
     if (selectionMode === "single") {
       return 1;
     }
@@ -57,17 +68,21 @@ const BetAmount = ({
     if (selectionMode === "ordered-direct") {
       return 1;
     }
-   
-  
 
     // TRIFECTA C (3 posiciones): P(n,3)
-    if (selectionMode === "ordered-combination" && betTypeConfig.positions === 3) {
+    if (
+      selectionMode === "ordered-combination" &&
+      betTypeConfig.positions === 3
+    ) {
       if (n < 3) return 0;
       return factorial(n) / factorial(n - 3);
     }
 
     // CUATRIFECTA C (4 posiciones): P(n,4)
-    if (selectionMode === "ordered-combination" && betTypeConfig.positions === 4) {
+    if (
+      selectionMode === "ordered-combination" &&
+      betTypeConfig.positions === 4
+    ) {
       if (n < 4) return 0;
       return factorial(n) / factorial(n - 4);
     }
@@ -94,7 +109,7 @@ const BetAmount = ({
   // 🎯 Calcular el monto total de la apuesta
   const calculateTotalAmount = (baseAmount) => {
     if (!baseAmount || baseAmount <= 0) return 0;
-    
+
     const multiplier = betTypeConfig.multiplier || 1;
     return baseAmount * combinaciones * multiplier;
   };
@@ -117,7 +132,9 @@ const BetAmount = ({
       return `La apuesta máxima es $${maxBetAmount.toLocaleString("es-AR")}`;
     }
     if (totalAmount > userSaldo) {
-      return `No tenés saldo suficiente. Total necesario: $${totalAmount.toLocaleString("es-AR")}`;
+      return `No tenés saldo suficiente. Total necesario: $${totalAmount.toLocaleString(
+        "es-AR"
+      )}`;
     }
     return "";
   };
@@ -157,6 +174,46 @@ const BetAmount = ({
     }
   };
 
+  // 🎯 Función para renderizar los caballos seleccionados
+  // 🎯 Función para renderizar los caballos seleccionados
+  const renderSelectedHorses = () => {
+    if (isGroupedSelection) {
+      // Obtener el número de posiciones según el tipo de apuesta
+      const positions = betTypeConfig?.positions || 2;
+
+      return (
+        <div className="space-y-2">
+          {Array.from({ length: positions }, (_, index) => {
+            const positionKey = `position${index + 1}`;
+            const positionHorses = selectedHorses[positionKey] || [];
+
+            return (
+              <div
+                key={positionKey}
+                className="flex justify-between items-start">
+                <span className="text-slate-400">{index + 1}° puesto:</span>
+                <span className="text-white font-semibold text-right">
+                  {positionHorses.length > 0
+                    ? positionHorses.map((h) => `#${h.number}`).join(", ")
+                    : "-"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // Para apuestas normales (array)
+    return (
+      <div className="flex justify-between items-center">
+        <span className="text-slate-400">Caballos seleccionados:</span>
+        <span className="text-white font-semibold">
+          {horsesArray.map((h) => `#${h.number}`).join(", ")}
+        </span>
+      </div>
+    );
+  };
   return (
     <div className="space-y-4">
       {/* Resumen de la apuesta */}
@@ -165,19 +222,17 @@ const BetAmount = ({
           <Check className="w-5 h-5" />
           Resumen de tu apuesta
         </h3>
-        
+
         <div className="space-y-2 text-sm">
           <div className="flex justify-between items-center">
             <span className="text-slate-400">Tipo de apuesta:</span>
-            <span className="text-white font-semibold">{betTypeConfig?.label || betType}</span>
-          </div>
-          
-          <div className="flex justify-between items-center">
-            <span className="text-slate-400">Caballos seleccionados:</span>
             <span className="text-white font-semibold">
-              {selectedHorses.map((h) => h.number).join(", ")}
+              {betTypeConfig?.label || betType}
             </span>
           </div>
+
+          {/* Renderizado dinámico de caballos */}
+          {renderSelectedHorses()}
 
           {betTypeConfig.type === "tira" && (
             <div className="flex justify-between items-center">
@@ -188,11 +243,25 @@ const BetAmount = ({
             </div>
           )}
 
+          {/* Para apuestas agrupadas, mostrar desglose */}
+          {isGroupedSelection && (
+            <div className="pt-2 border-t border-slate-700/50 text-xs text-slate-400">
+              <p>
+                💡 Se generan {combinaciones} combinaciones:
+                {` ${selectedHorses.position1?.length || 0} (1°) × ${
+                  selectedHorses.position2?.length || 0
+                } (2°)`}
+              </p>
+            </div>
+          )}
+
           <div className="flex justify-between items-center pt-2 border-t border-slate-700/50">
             <span className="text-slate-400">
               {combinaciones === 1 ? "Apuesta única:" : "Combinaciones:"}
             </span>
-            <span className="text-amber-300 font-bold text-lg">{combinaciones}</span>
+            <span className="text-amber-300 font-bold text-lg">
+              {combinaciones}
+            </span>
           </div>
         </div>
       </div>
@@ -238,7 +307,8 @@ const BetAmount = ({
             />
           </div>
           <p className="text-slate-500 text-xs">
-            Rango permitido: ${minBetAmount.toLocaleString("es-AR")} - ${maxBetAmount.toLocaleString("es-AR")}
+            Rango permitido: ${minBetAmount.toLocaleString("es-AR")} - $
+            {maxBetAmount.toLocaleString("es-AR")}
           </p>
         </div>
       </div>
@@ -258,11 +328,13 @@ const BetAmount = ({
         {combinaciones > 1 && amount > 0 && (
           <div className="text-xs text-slate-400 space-y-1">
             <p>
-              💡 ${amount.toLocaleString("es-AR")} por combinación × {combinaciones} combinaciones
+              💡 ${amount.toLocaleString("es-AR")} por combinación ×{" "}
+              {combinaciones} combinaciones
             </p>
             {betTypeConfig.multiplier && betTypeConfig.multiplier > 1 && (
               <p>
-                × {betTypeConfig.multiplier} (multiplicador de {betTypeConfig.label})
+                × {betTypeConfig.multiplier} (multiplicador de{" "}
+                {betTypeConfig.label})
               </p>
             )}
           </div>
@@ -270,9 +342,10 @@ const BetAmount = ({
 
         <div className="mt-3 pt-3 border-t border-amber-500/20 flex items-center justify-between">
           <span className="text-slate-400 text-sm">Tu saldo disponible:</span>
-          <span className={`font-bold ${
-            totalAmount > userSaldo ? "text-red-400" : "text-emerald-400"
-          }`}>
+          <span
+            className={`font-bold ${
+              totalAmount > userSaldo ? "text-red-400" : "text-emerald-400"
+            }`}>
             ${userSaldo.toLocaleString("es-AR")}
           </span>
         </div>
