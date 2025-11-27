@@ -6,7 +6,7 @@ import RacesList from "./components/RacesList";
 import BetModal from "./components/BetModal";
 import { Menu, X, Calendar, LogOut, User, Wallet, Plus } from "lucide-react";
 import "./App.css";
-   import logoCaballo from "./assets/logocaballo.png";
+import logoCaballo from "./assets/logocaballo.png";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -23,27 +23,50 @@ function App() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-
+  
   const userId = user ? user.uid : null;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
-
+      
       if (currentUser) {
+        // ✅ Escuchar desde la colección "users" (minúsculas)
         const unsubscribeUserData = onSnapshot(
-          doc(db, "USUARIOS", currentUser.uid),
+          doc(db, "users", currentUser.uid),
           (docSnap) => {
             if (docSnap.exists()) {
-              setUserData(docSnap.data());
+              const data = docSnap.data();
+              
+              // ✅ Mapear los campos nuevos a los antiguos para compatibilidad
+              setUserData({
+                EMAIL: data.email,
+                SALDO: data.balance,
+                ID: currentUser.uid,
+                // Campos nuevos también disponibles
+                name: data.name,
+                role: data.role,
+                totalBet: data.totalBet || 0,
+                totalWon: data.totalWon || 0,
+                totalLost: data.totalLost || 0,
+              });
+
+              console.log("✅ Datos usuario cargados:", {
+                email: data.email,
+                balance: data.balance,
+                role: data.role
+              });
+            } else {
+              console.warn("⚠️ Usuario no encontrado en colección 'users'");
+              setUserData(null);
             }
           },
           (error) => {
-            console.error("Error al cargar datos del usuario:", error);
+            console.error("❌ Error al cargar datos del usuario:", error);
           }
         );
-
+        
         return () => unsubscribeUserData();
       } else {
         setUserData(null);
@@ -70,7 +93,7 @@ function App() {
       const jsonStart = text.indexOf('{"error"');
       const jsonText = text.substring(jsonStart);
       const jsonData = JSON.parse(jsonText);
-
+      
       if (jsonData.error === 0) {
         setData(jsonData);
         if (jsonData.hipodromos.length > 0) {
@@ -93,7 +116,7 @@ function App() {
       const jsonStart = text.indexOf('{"error"');
       const jsonText = text.substring(jsonStart);
       const jsonData = JSON.parse(jsonText);
-
+      
       if (jsonData.error === 0 && jsonData.grupos) {
         setTransmisiones(jsonData.grupos);
       }
@@ -112,13 +135,27 @@ function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError("");
+    
     try {
       await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
       setShowLoginModal(false);
       setLoginEmail("");
       setLoginPassword("");
     } catch (error) {
-      setLoginError("Correo o contraseña incorrectos");
+      console.error("Error login:", error);
+      
+      let errorMsg = "Correo o contraseña incorrectos";
+      if (error.code === 'auth/user-not-found') {
+        errorMsg = "Usuario no encontrado. Contacta al administrador.";
+      } else if (error.code === 'auth/wrong-password') {
+        errorMsg = "Contraseña incorrecta";
+      } else if (error.code === 'auth/invalid-credential') {
+        errorMsg = "Credenciales inválidas";
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMsg = "Demasiados intentos. Intenta más tarde.";
+      }
+      
+      setLoginError(errorMsg);
     }
   };
 
@@ -131,9 +168,7 @@ function App() {
 
   const handleAddBalance = () => {
     if (user && userData) {
-      const mensaje = `Hola, quiero agregar saldo a mi cuenta.%0A%0AID de Usuario: ${
-        user.uid
-      }%0AEmail: ${userData.EMAIL}%0ASaldo actual: $${userData.SALDO || 0}`;
+      const mensaje = `Hola, quiero agregar saldo a mi cuenta.%0A%0AID de Usuario: ${user.uid}%0AEmail: ${userData.EMAIL}%0ASaldo actual: $${userData.SALDO || 0}`;
       window.open(`https://wa.me/543813444655?text=${mensaje}`, "_blank");
     }
   };
@@ -153,7 +188,6 @@ function App() {
       </div>
     );
   }
-
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-950 via-fuchsia-950 to-slate-950">
       {/* Header */}

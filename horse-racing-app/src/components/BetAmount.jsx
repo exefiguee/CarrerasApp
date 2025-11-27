@@ -49,7 +49,7 @@ const BetAmount = ({
   // ... (TODO tu código de cálculos existente se mantiene igual)
   
   const usesVales = () => {
-    const excludedTypes = ["ganador", "segundo", "tercero"];
+    const excludedTypes = ["ganador", "segundo", "tercero", "tira(1,2,3)"];
     const normalizedType = betTypeConfig?.originalKey?.toLowerCase().trim();
     return !excludedTypes.includes(normalizedType);
   };

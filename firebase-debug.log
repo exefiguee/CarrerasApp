@@ -1,0 +1,83 @@
+[debug] [2025-11-24T04:21:14.264Z] ----------------------------------------------------------------------
+[debug] [2025-11-24T04:21:14.273Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\exefi\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init functions
+[debug] [2025-11-24T04:21:14.274Z] CLI Version:   14.25.1
+[debug] [2025-11-24T04:21:14.275Z] Platform:      win32
+[debug] [2025-11-24T04:21:14.275Z] Node Version:  v22.20.0
+[debug] [2025-11-24T04:21:14.276Z] Time:          Mon Nov 24 2025 01:21:14 GMT-0300 (hora estándar de Argentina)
+[debug] [2025-11-24T04:21:14.276Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-11-24T04:21:14.282Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  C:\Users\exefi\OneDrive\Desktop\PROYECTO_CARRERA\CarrerasApp
+
+[debug] [2025-11-24T04:21:14.992Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2025-11-24T04:21:14.993Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] 
+[debug] [2025-11-24T04:21:34.305Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-11-24T04:21:34.306Z] > authorizing via signed-in user (exefiguee@gmail.com)
+[debug] [2025-11-24T04:21:34.307Z] Checked if tokens are valid: false, expires at: 1763864503974
+[debug] [2025-11-24T04:21:34.307Z] Checked if tokens are valid: false, expires at: 1763864503974
+[debug] [2025-11-24T04:21:34.307Z] > refreshing access token with scopes: []
+[debug] [2025-11-24T04:21:34.309Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-11-24T04:21:34.309Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-24T04:21:34.482Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-11-24T04:21:34.482Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-11-24T04:21:34.498Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects pageSize=100
+[debug] [2025-11-24T04:21:36.057Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects 200
+[debug] [2025-11-24T04:21:36.057Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects [omitted]
+[info] 
+=== Functions Setup
+[debug] [2025-11-24T04:21:45.426Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-11-24T04:21:45.426Z] > authorizing via signed-in user (exefiguee@gmail.com)
+[debug] [2025-11-24T04:21:45.426Z] [iam] checking project corseweb-914bf for permissions ["firebase.projects.get"]
+[debug] [2025-11-24T04:21:45.427Z] Checked if tokens are valid: true, expires at: 1763961693482
+[debug] [2025-11-24T04:21:45.427Z] Checked if tokens are valid: true, expires at: 1763961693482
+[debug] [2025-11-24T04:21:45.427Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/corseweb-914bf:testIamPermissions [none]
+[debug] [2025-11-24T04:21:45.427Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/corseweb-914bf:testIamPermissions x-goog-quota-user=projects/corseweb-914bf
+[debug] [2025-11-24T04:21:45.427Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/corseweb-914bf:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2025-11-24T04:21:46.347Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/corseweb-914bf:testIamPermissions 200
+[debug] [2025-11-24T04:21:46.347Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/corseweb-914bf:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2025-11-24T04:21:46.349Z] Checked if tokens are valid: true, expires at: 1763961693482
+[debug] [2025-11-24T04:21:46.349Z] Checked if tokens are valid: true, expires at: 1763961693482
+[debug] [2025-11-24T04:21:46.349Z] Checked if tokens are valid: true, expires at: 1763961693482
+[debug] [2025-11-24T04:21:46.349Z] Checked if tokens are valid: true, expires at: 1763961693482
+[debug] [2025-11-24T04:21:46.350Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/corseweb-914bf/services/cloudfunctions.googleapis.com [none]
+[debug] [2025-11-24T04:21:46.350Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/corseweb-914bf/services/cloudfunctions.googleapis.com x-goog-quota-user=projects/corseweb-914bf
+[debug] [2025-11-24T04:21:46.351Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/corseweb-914bf/services/runtimeconfig.googleapis.com [none]
+[debug] [2025-11-24T04:21:46.351Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/corseweb-914bf/services/runtimeconfig.googleapis.com x-goog-quota-user=projects/corseweb-914bf
+[debug] [2025-11-24T04:21:47.436Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/corseweb-914bf/services/runtimeconfig.googleapis.com 200
+[debug] [2025-11-24T04:21:47.437Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/corseweb-914bf/services/runtimeconfig.googleapis.com [omitted]
+[debug] [2025-11-24T04:21:47.450Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/corseweb-914bf/services/cloudfunctions.googleapis.com 200
+[debug] [2025-11-24T04:21:47.450Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/corseweb-914bf/services/cloudfunctions.googleapis.com [omitted]
+[debug] [2025-11-24T04:21:47.450Z] Checked if tokens are valid: true, expires at: 1763961693482
+[debug] [2025-11-24T04:21:47.450Z] Checked if tokens are valid: true, expires at: 1763961693482
+[debug] [2025-11-24T04:21:47.450Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/corseweb-914bf/services/cloudfunctions.googleapis.com:enable [none]
+[debug] [2025-11-24T04:21:47.450Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/corseweb-914bf/services/cloudfunctions.googleapis.com:enable x-goog-quota-user=projects/corseweb-914bf
+[debug] [2025-11-24T04:21:48.115Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/corseweb-914bf/services/cloudfunctions.googleapis.com:enable 200
+[debug] [2025-11-24T04:21:48.116Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/corseweb-914bf/services/cloudfunctions.googleapis.com:enable [omitted]
+[info] Let's create a new codebase for your functions.
+[info] A directory corresponding to the codebase will be created in your project
+[info] with sample code pre-configured.
+
+[info] See https://firebase.google.com/docs/functions/organize-functions for
+[info] more information on organizing your functions using codebases.
+
+[info] Functions can be deployed with firebase deploy.
+
+[info] +  Wrote functions/package.json 
+[info] +  Wrote functions/.eslintrc.js 
+[info] +  Wrote functions/index.js 
+[info] +  Wrote functions/.gitignore 

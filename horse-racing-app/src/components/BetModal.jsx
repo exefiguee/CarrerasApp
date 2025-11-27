@@ -118,17 +118,15 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
       howItWorks: "El caballo debe llegar en 3° lugar",
     },
 
-    "TIRA(1,2,3)": {
-      maxHorses: 10,
-      minHorses: 3,
-      type: "combinada-ordenada",
-      positions: 3,
-      selectionMode: "ordered-combination",
-      description: "1 caballo para ganador, segundo Y tercero",
-      howItWorks:
-        "El caballo debe llegar en los 3 primeros puestos. Son 3 apuestas en 1.",
-    },
-
+   "TIRA(1,2,3)": {
+        maxHorses: 1,
+        minHorses: 1,
+        type: "simple",
+        selectionMode: "single",
+        description: "1 caballo para ganador, segundo Y tercero",
+        howItWorks:
+          "El caballo debe llegar en los 3 primeros puestos. Son 3 apuestas en 1.",
+      },
     EXACTA: {
       maxHorses: 10,
       minHorses: 2,

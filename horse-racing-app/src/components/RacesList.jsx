@@ -628,16 +628,41 @@ const RacesList = ({ onSelectRace }) => {
     };
   };
 
+  // ... resto de tu código ...
+
   const guardarCarrerasEnFirestore = async (jsonData) => {
     try {
-      if (!jsonData || !jsonData.carreras) return;
+      // ✅ VALIDACIÓN INICIAL
+      if (!jsonData || !jsonData.carreras) {
+        console.warn("⚠️ No hay datos de carreras");
+        return;
+      }
 
-      // 🔥 FILTRAR SOLO HIPÓDROMOS DE ARGENTINA
+      // ✅ VALIDAR QUE EXISTA hipodromos
+      if (!jsonData.hipodromos || !Array.isArray(jsonData.hipodromos)) {
+        console.warn("⚠️ No se encontró el array de hipódromos");
+        return;
+      }
+
+      // 📊 DEBUG: Mostrar estructura de datos
+      console.log("📊 Estructura de jsonData:", {
+        tieneCarreras: !!jsonData?.carreras,
+        tieneHipodromos: !!jsonData?.hipodromos,
+        cantidadCarreras: jsonData?.carreras?.length,
+        cantidadHipodromos: jsonData?.hipodromos?.length,
+      });
+
       // 🔥 FILTRAR SOLO HIPÓDROMOS: PALERMO, SAN ISIDRO, LA PLATA
       const nombresPermitidos = ["PALERMO", "SAN ISIDRO", "LA PLATA"];
 
       const hipodromosArg = jsonData.hipodromos.filter((h) => {
-        const descripcion = (h.descripcion || "").toUpperCase();
+        // ✅ VALIDAR que h existe y tiene descripcion
+        if (!h || typeof h.descripcion !== "string") {
+          console.warn("⚠️ Hipódromo sin descripción válida:", h);
+          return false;
+        }
+
+        const descripcion = h.descripcion.toUpperCase();
         const coincide = nombresPermitidos.some((nombre) =>
           descripcion.includes(nombre)
         );
@@ -654,6 +679,12 @@ const RacesList = ({ onSelectRace }) => {
       console.log(
         `🏟️ Total hipódromos argentinos filtrados: ${hipodromosArg.length}`
       );
+
+      // ✅ Si no hay hipódromos argentinos, salir
+      if (hipodromosArg.length === 0) {
+        console.warn("⚠️ No se encontraron hipódromos argentinos");
+        return;
+      }
 
       const idsHipodromosArg = new Set(hipodromosArg.map((h) => h.id));
 
@@ -677,7 +708,9 @@ const RacesList = ({ onSelectRace }) => {
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        carrerasExistentes.set(data.id_carrera, {
+        // 🔑 Clave única: id_carrera + fecha
+        const claveUnica = `${data.id_carrera}_${data.fecha_texto}`;
+        carrerasExistentes.set(claveUnica, {
           firebaseId: doc.id,
           ...data,
         });
@@ -688,7 +721,9 @@ const RacesList = ({ onSelectRace }) => {
 
       // 🔥 RECORRER SOLO CARRERAS ARGENTINAS
       for (const carrera of carrerasFiltradas) {
-        const carreraExistente = carrerasExistentes.get(carrera.id);
+        // 🔑 Verificar por id_carrera + fecha
+        const claveUnica = `${carrera.id}_${carrera.fecha}`;
+        const carreraExistente = carrerasExistentes.get(claveUnica);
 
         if (carreraExistente) {
           sinCambios++;
@@ -733,15 +768,54 @@ const RacesList = ({ onSelectRace }) => {
       );
     } catch (error) {
       console.error("❌ Error guardando carreras:", error);
+      console.error("Stack trace:", error.stack);
+    }
+  };
+  // 🔐 OBTENER CONFIGURACIÓN DESDE FIREBASE
+  const obtenerConfiguracion = async () => {
+    try {
+      const adminRef = collection(db, "ADMINISTRADORES");
+      const adminSnapshot = await getDocs(adminRef);
+
+      if (!adminSnapshot.empty) {
+        const adminDoc = adminSnapshot.docs[0].data();
+        return {
+          urlCarreras: adminDoc.URL || "",
+          urlTransmisiones: adminDoc.URL_TRANSMISIONES || "",
+          apiActiva: adminDoc["9090907878"] === true, // Solo true activa la API
+        };
+      }
+      // Si no hay documento, no hay configuración
+      return {
+        urlCarreras: "",
+        urlTransmisiones: "",
+        apiActiva: false,
+      };
+    } catch (err) {
+      console.error("❌ Error obteniendo configuración:", err);
+      return { urlCarreras: "", urlTransmisiones: "", apiActiva: false };
     }
   };
 
   const cargarDatos = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        "https://xwdc.net/nuevo/ext_datos_carrerasv2.php"
-      );
+      console.log("🕒 Iniciando carga de carreras...");
+
+      // 🔐 Obtener configuración
+      const config = await obtenerConfiguracion();
+
+      if (!config.apiActiva) {
+        setError("API no disponible.");
+        return;
+      }
+
+      if (!config.urlCarreras) {
+        setError("URL de carreras no configurada");
+        return;
+      }
+
+      const response = await fetch(config.urlCarreras);
       const text = await response.text();
       const jsonStart = text.indexOf('{"error"');
       const jsonText = text.substring(jsonStart);
@@ -759,9 +833,23 @@ const RacesList = ({ onSelectRace }) => {
       setLoading(false);
     }
   };
+
   const cargarTransmisiones = async () => {
     try {
-      const res = await fetch("https://xwdc.net/nuevo/ext_gruposv2.php");
+      // 🔐 Obtener configuración
+      const config = await obtenerConfiguracion();
+
+      if (!config.apiActiva) {
+        console.error("❌ API no disponible");
+        return;
+      }
+
+      if (!config.urlTransmisiones) {
+        console.error("❌ URL de transmisiones no configurada");
+        return;
+      }
+
+      const res = await fetch(config.urlTransmisiones);
       const text = await res.text();
       const jsonStart = text.indexOf('{"error"');
       const jsonText = text.substring(jsonStart);
@@ -774,6 +862,56 @@ const RacesList = ({ onSelectRace }) => {
       console.error("Error al cargar transmisiones:", err);
     }
   };
+
+  // ⏰ FUNCIÓN PARA CALCULAR TIEMPO HASTA LAS 3:15 AM
+  const calcularTiempoHasta315AM = () => {
+    const ahora = new Date();
+    const objetivo = new Date();
+
+    // Configurar para las 3:15 AM
+    objetivo.setHours(2, 5, 0, 0);
+
+    // Si ya pasaron las 3:15 AM hoy, programar para mañana
+    if (ahora >= objetivo) {
+      objetivo.setDate(objetivo.getDate() + 1);
+    }
+
+    return objetivo.getTime() - ahora.getTime();
+  };
+
+  useEffect(() => {
+    let timeoutId;
+
+    const programarCargaDiaria = () => {
+      const tiempoRestante = calcularTiempoHasta315AM();
+      const fechaObjetivo = new Date(Date.now() + tiempoRestante);
+
+      console.log(
+        `⏰ Próxima carga automática: ${fechaObjetivo.toLocaleString("es-AR")}`
+      );
+
+      timeoutId = setTimeout(async () => {
+        console.log(
+          "🚀 CARGA AUTOMÁTICA - 3:15 AM - Obteniendo carreras del día"
+        );
+        await cargarDatos();
+
+        // Reprogramar para mañana
+        programarCargaDiaria();
+      }, tiempoRestante);
+    };
+
+    // Iniciar programación
+    programarCargaDiaria();
+
+    // Cleanup
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        console.log("⏰ Timer cancelado");
+      }
+    };
+  }, []);
 
   const getCarrerasDelHipodromo = () => {
     if (!selectedHipodromo) return [];

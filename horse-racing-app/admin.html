@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Panel - Horse Racing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+      import {
+        getAuth,
+        createUserWithEmailAndPassword,
+        onAuthStateChanged,
+        signOut,
+      } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+      import {
+        getFirestore,
+        doc,
+        setDoc,
+        getDoc,
+        collection,
+        query,
+        orderBy,
+        onSnapshot,
+        updateDoc,
+        deleteDoc,
+      } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyAGAkg8tc0AV6WhGxnZISnI0OScaqQV1P0",
+        authDomain: "corseweb-914bf.firebaseapp.com",
+        projectId: "corseweb-914bf",
+        storageBucket: "corseweb-914bf.firebasestorage.app",
+        messagingSenderId: "771172579871",
+        appId: "1:771172579871:web:47a0015fa0aa4213d2332a",
+        measurementId: "G-GMR6X5C05Z",
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      // Verificar que el usuario es admin
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+          window.location.href = "index.html";
+          return;
+        }
+
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (!userDoc.exists() || userDoc.data().role !== "admin") {
+          alert("No tenés permisos de administrador");
+          window.location.href = "index.html";
+          return;
+        }
+
+        // Cargar usuarios
+        loadUsers();
+        loadRechargeRequests();
+      });
+
+      // Cerrar sesión
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        signOut(auth);
+      });
+
+      // Crear usuario
+      document
+        .getElementById("createUserForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const email = document.getElementById("newUserEmail").value;
+          const password = document.getElementById("newUserPassword").value;
+          const initialBalance =
+            parseFloat(document.getElementById("initialBalance").value) || 0;
+          const userName = document.getElementById("userName").value;
+
+          const btnCreate = document.getElementById("btnCreate");
+          btnCreate.disabled = true;
+          btnCreate.textContent = "Creando...";
+
+          try {
+            // Crear usuario en Authentication
+            const userCredential = await createUserWithEmailAndPassword(
+              auth,
+              email,
+              password
+            );
+            const newUser = userCredential.user;
+
+            // Crear documento en Firestore
+            await setDoc(doc(db, "users", newUser.uid), {
+              email: email,
+              name: userName,
+              balance: initialBalance,
+              role: "user",
+              totalBet: 0,
+              totalWon: 0,
+              totalLost: 0,
+              createdAt: new Date(),
+              createdBy: auth.currentUser.uid,
+            });
+
+            // Mostrar credenciales
+            const credentials = `
+✅ Usuario creado exitosamente
+
+📧 Email: ${email}
+🔑 Contraseña: ${password}
+💰 Saldo inicial: $${initialBalance}
+
+Enviá estas credenciales al usuario por WhatsApp.
+            `;
+
+            alert(credentials);
+
+            // Limpiar formulario
+            document.getElementById("createUserForm").reset();
+          } catch (error) {
+            alert("Error al crear usuario: " + error.message);
+          } finally {
+            btnCreate.disabled = false;
+            btnCreate.textContent = "Crear Usuario";
+          }
+        });
+
+      // Cargar lista de usuarios
+      function loadUsers() {
+        const q = query(
+          collection(db, "users"),
+          orderBy("createdAt", "desc")
+        );
+
+        onSnapshot(q, (snapshot) => {
+          const usersList = document.getElementById("usersList");
+          usersList.innerHTML = "";
+
+          snapshot.forEach((doc) => {
+            const user = doc.data();
+            const userId = doc.id;
+
+            const userCard = `
+              <div class="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 class="font-bold text-lg">${user.name || "Sin nombre"}</h3>
+                    <p class="text-sm text-gray-600">${user.email}</p>
+                  </div>
+                  <span class="px-3 py-1 rounded-full text-xs font-semibold ${
+                    user.role === "admin"
+                      ? "bg-red-100 text-red-800"
+                      : "bg-blue-100 text-blue-800"
+                  }">
+                    ${user.role === "admin" ? "ADMIN" : "USUARIO"}
+                  </span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-sm mt-3">
+                  <div>💰 Balance: <strong>$${user.balance || 0}</strong></div>
+                  <div>🎯 Apostado: $${user.totalBet || 0}</div>
+                  <div>✅ Ganado: $${user.totalWon || 0}</div>
+                  <div>❌ Perdido: $${user.totalLost || 0}</div>
+                </div>
+                <div class="mt-3 flex gap-2">
+                  <button onclick="addBalance('${userId}')" class="flex-1 bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">
+                    💵 Cargar Saldo
+                  </button>
+                  ${
+                    user.role !== "admin"
+                      ? `<button onclick="deleteUser('${userId}')" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">
+                    🗑️
+                  </button>`
+                      : ""
+                  }
+                </div>
+              </div>
+            `;
+
+            usersList.innerHTML += userCard;
+          });
+        });
+      }
+
+      // Cargar solicitudes de recarga
+      function loadRechargeRequests() {
+        const q = query(
+          collection(db, "rechargeRequests"),
+          orderBy("createdAt", "desc")
+        );
+
+        onSnapshot(q, (snapshot) => {
+          const requestsList = document.getElementById("requestsList");
+          requestsList.innerHTML = "";
+
+          if (snapshot.empty) {
+            requestsList.innerHTML =
+              '<p class="text-gray-500 text-center py-4">No hay solicitudes pendientes</p>';
+            return;
+          }
+
+          snapshot.forEach((doc) => {
+            const request = doc.data();
+            const requestId = doc.id;
+
+            if (request.status === "pending") {
+              const requestCard = `
+                <div class="border border-yellow-300 bg-yellow-50 rounded-lg p-4">
+                  <div class="flex justify-between items-start mb-2">
+                    <div>
+                      <p class="font-bold">${request.userEmail || "Usuario"}</p>
+                      <p class="text-2xl font-bold text-green-600">$${request.amount}</p>
+                    </div>
+                    <span class="px-2 py-1 bg-yellow-200 text-yellow-800 rounded text-xs font-semibold">
+                      PENDIENTE
+                    </span>
+                  </div>
+                  <div class="flex gap-2 mt-3">
+                    <button onclick="approveRecharge('${requestId}')" class="flex-1 bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600">
+                      ✅ Aprobar
+                    </button>
+                    <button onclick="rejectRecharge('${requestId}')" class="flex-1 bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600">
+                      ❌ Rechazar
+                    </button>
+                  </div>
+                </div>
+              `;
+
+              requestsList.innerHTML += requestCard;
+            }
+          });
+        });
+      }
+
+      // Funciones globales
+      window.addBalance = async (userId) => {
+        const amount = prompt("¿Cuánto saldo querés agregar?");
+        if (!amount || isNaN(amount)) return;
+
+        const userRef = doc(db, "users", userId);
+        const userDoc = await getDoc(userRef);
+        const currentBalance = userDoc.data().balance || 0;
+
+        await updateDoc(userRef, {
+          balance: currentBalance + parseFloat(amount),
+        });
+
+        alert(`✅ Se agregaron $${amount} al usuario`);
+      };
+
+      window.deleteUser = async (userId) => {
+        if (!confirm("¿Estás seguro de eliminar este usuario?")) return;
+
+        await deleteDoc(doc(db, "users", userId));
+        alert("Usuario eliminado");
+      };
+
+      window.approveRecharge = async (requestId) => {
+        // Llamar a la Cloud Function
+        const paymentMethod = prompt("Método de pago:", "Transferencia");
+        if (!paymentMethod) return;
+
+        // Aquí llamarías a tu Cloud Function approveRecharge
+        alert("Función de aprobar recarga (implementar con Cloud Function)");
+      };
+
+      window.rejectRecharge = async (requestId) => {
+        if (!confirm("¿Rechazar esta solicitud?")) return;
+
+        await updateDoc(doc(db, "rechargeRequests", requestId), {
+          status: "rejected",
+          rejectedAt: new Date(),
+        });
+
+        alert("Solicitud rechazada");
+      };
+    </script>
+  </head>
+  <body class="bg-gray-100">
+    <div class="min-h-screen">
+      <!-- Header -->
+      <header class="bg-red-600 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+          <h1 class="text-2xl font-bold">🏇 Panel de Administración</h1>
+          <button
+            id="logoutBtn"
+            class="bg-red-700 hover:bg-red-800 px-4 py-2 rounded">
+            Cerrar Sesión
+          </button>
+        </div>
+      </header>
+
+      <div class="container mx-auto p-4 max-w-6xl">
+        <!-- Crear Usuario -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 class="text-xl font-bold mb-4">➕ Crear Nuevo Usuario</h2>
+          <form id="createUserForm" class="grid md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              id="userName"
+              placeholder="Nombre del usuario"
+              required
+              class="border rounded px-3 py-2" />
+            <input
+              type="email"
+              id="newUserEmail"
+              placeholder="Email"
+              required
+              class="border rounded px-3 py-2" />
+            <input
+              type="password"
+              id="newUserPassword"
+              placeholder="Contraseña"
+              required
+              minlength="6"
+              class="border rounded px-3 py-2" />
+            <input
+              type="number"
+              id="initialBalance"
+              placeholder="Saldo inicial"
+              value="0"
+              min="0"
+              class="border rounded px-3 py-2" />
+            <button
+              id="btnCreate"
+              type="submit"
+              class="md:col-span-2 bg-red-600 text-white font-bold py-2 rounded hover:bg-red-700">
+              Crear Usuario
+            </button>
+          </form>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-6">
+          <!-- Lista de Usuarios -->
+          <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-bold mb-4">👥 Usuarios</h2>
+            <div id="usersList" class="space-y-4"></div>
+          </div>
+
+          <!-- Solicitudes de Recarga -->
+          <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-bold mb-4">💰 Solicitudes de Recarga</h2>
+            <div id="requestsList" class="space-y-4"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
