@@ -4,7 +4,9 @@ import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import RacesList from "./components/RacesList";
 import BetModal from "./components/BetModal";
-import { Menu, X, Calendar, LogOut, User, Wallet, Plus } from "lucide-react";
+import Crear123 from "./components/CreateUser";
+import AllBet from "./components/AllBet";
+import { Menu, X, Calendar, LogOut, User, Wallet, Plus, UserPlus, List } from "lucide-react";
 import "./App.css";
 import logoCaballo from "./assets/logocaballo.png";
 
@@ -20,6 +22,8 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [showAllBetsModal, setShowAllBetsModal] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -188,6 +192,27 @@ function App() {
       </div>
     );
   }
+
+  // Si showAllBetsModal está activo, mostrar AllBets en pantalla completa
+  if (showAllBetsModal) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-fuchsia-950 to-slate-950">
+        {/* Header simple con botón de volver */}
+        <header className="bg-slate-900/95 backdrop-blur-xl border-b border-fuchsia-900/30 shadow-2xl shadow-fuchsia-900/20 sticky top-0 z-50">
+          <div className="container mx-auto px-4 py-4">
+            <button
+              onClick={() => setShowAllBetsModal(false)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-fuchsia-900/30 hover:border-fuchsia-500/40 text-slate-300 hover:text-white transition-all">
+              <X className="w-5 h-5" />
+              <span className="font-semibold">Volver</span>
+            </button>
+          </div>
+        </header>
+        <AllBet />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-950 via-fuchsia-950 to-slate-950">
       {/* Header */}
@@ -197,44 +222,14 @@ function App() {
             {/* Logo */}
             <div className="flex items-center gap-3">
               <div className="w-16 h-16 md:w-20 md:h-20">
-                      <img
-              src={logoCaballo}
-              alt="TURF424.BET"
-              className="w-full h-full object-contain rounded-2xl"
-            />
+                <img
+                  src={logoCaballo}
+                  alt="TURF424.BET"
+                  className="w-full h-full object-contain rounded-2xl"
+                />
               </div>
 
               <div>
-                {/* <div className="text-center">
-                  <h1
-                    className="text-5xl md:text-2xl font-extrabold tracking-tight text-left"
-                    style={{
-                      color: '#ff00cc',
-                      textShadow: `0 0 2px #fff,0 0 3px #fff,0 0 4px #fff`,
-                    }}
-                  >
-                    TURF
-                    <span
-                      style={{
-                        color: 'white',
-                        textShadow: `0 0 2px #ff00cc, 0 0 3px #ff00cc, 0 0 4px #ff00cc`,
-                      }}
-                    >
-                      424
-                    </span>
-                    .BET
-                  </h1>
-
-                  <p
-                    className="text-sm md:text-lg font-semibold tracking-wider text-white"
-                    style={{
-                      textShadow: `0 0 3px #ff00ff,0 0 4px #ff00ff`,
-                    }}
-                  >
-                    GANA CON PASIÓN, GANA CON TURF424.BET
-                  </p>
-                </div> */}
-
                 <div className="flex items-center">
                   <img
                     src="/title.png"
@@ -273,6 +268,22 @@ function App() {
                     {data?.carreras.length || 0}
                   </p>
                 </div>
+                
+                {/* 🆕 Botón Ver Todas las Apuestas - Desktop */}
+                <button
+                  onClick={() => setShowAllBetsModal(true)}
+                  className="p-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 backdrop-blur-sm border border-blue-500/40 text-white transition-all shadow-lg shadow-blue-500/20 hover:scale-105"
+                  title="Ver Todas las Apuestas">
+                  <List className="w-5 h-5" />
+                </button>
+
+                {/* Botón Crear Usuario - Desktop */}
+                <button
+                  onClick={() => setShowCreateUserModal(true)}
+                  className="p-2.5 rounded-xl bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 backdrop-blur-sm border border-green-500/40 text-white transition-all shadow-lg shadow-green-500/20 hover:scale-105"
+                  title="Crear Usuario">
+                  <UserPlus className="w-5 h-5" />
+                </button>
               </div>
 
               {user ? (
@@ -301,7 +312,7 @@ function App() {
                   <button
                     onClick={() => setShowLoginModal(true)}
                     className="p-2.5 rounded-xl bg-slate-800/50 backdrop-blur-sm border border-fuchsia-900/30 text-slate-300 hover:text-fuchsia-400 hover:bg-slate-800 hover:border-fuchsia-500/40 transition-all"
-                    title="Ver Perfil">
+                    title="Iniciar Sesión">
                     <User className="w-5 h-5" />
                   </button>
                 </div>
@@ -336,6 +347,23 @@ function App() {
                     {data?.carreras.length || 0}
                   </p>
                 </div>
+              </div>
+
+              {/* Botones Admin - Mobile */}
+              <div className="space-y-2 mb-4">
+                <button
+                  onClick={() => setShowAllBetsModal(true)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 backdrop-blur-sm border border-blue-500/40 text-white transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 font-semibold">
+                  <List className="w-5 h-5" />
+                  Ver Todas las Apuestas
+                </button>
+
+                <button
+                  onClick={() => setShowCreateUserModal(true)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 backdrop-blur-sm border border-green-500/40 text-white transition-all shadow-lg shadow-green-500/20 flex items-center justify-center gap-2 font-semibold">
+                  <UserPlus className="w-5 h-5" />
+                  Crear Usuario
+                </button>
               </div>
 
               {user ? (
@@ -385,6 +413,31 @@ function App() {
       <main className="flex-1 overflow-y-auto">
         <RacesList onSelectRace={handleSelectRace} />
       </main>
+
+      {/* Modal Crear Usuario */}
+      {showCreateUserModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center z-50 p-3">
+          <div className="bg-fuchsia-950/35 backdrop-blur-xl rounded-2xl p-5 max-w-4xl w-full border border-fuchsia-500/30 shadow-2xl shadow-fuchsia-900/30 relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setShowCreateUserModal(false)}
+              className="absolute top-3 right-3 p-2 rounded-lg bg-fuchsia-900/60 backdrop-blur-sm border border-fuchsia-700/30 text-fuchsia-200 hover:text-white hover:bg-fuchsia-900/80 transition-all z-10">
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex flex-col items-center text-center mb-4">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/30 mb-3 border-2 border-white/10">
+                <UserPlus className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-0.5">Crear Usuario</h3>
+              <p className="text-xs text-fuchsia-300">
+                Administrar usuarios del sistema
+              </p>
+            </div>
+
+            <Crear123 />
+          </div>
+        </div>
+      )}
 
       {/* Profile Modal */}
       {showProfileModal && user && userData && (
@@ -479,9 +532,7 @@ function App() {
 
                   <button
                     onClick={handleAddBalance}
-                    className="flex items-center  gap-2 px-3 py-2 bg-gradient-to-r from-fuchsia-600 to-fuchsia-600
-    hover:from-fuchsia-400 hover:to-fuchsia-400 text-white rounded-lg font-bold text-sm
-    transition-all shadow-lg shadow-fuchsia-500/20 hover:scale-[1.05]">
+                    className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-fuchsia-600 to-fuchsia-600 hover:from-fuchsia-400 hover:to-fuchsia-400 text-white rounded-lg font-bold text-sm transition-all shadow-lg shadow-fuchsia-500/20 hover:scale-[1.05]">
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
