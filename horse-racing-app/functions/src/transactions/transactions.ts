@@ -24,7 +24,7 @@ export const approveRecharge = functions.https.onCall(async (request) => {
     throw new functions.https.HttpsError('unauthenticated', 'No autenticado');
   }
 
-  const adminRef = db.collection('users').doc(request.auth.uid);
+  const adminRef = db.collection('USUARIOS').doc(request.auth.uid);
   const adminDoc = await adminRef.get();
   
   if (!adminDoc.exists || adminDoc.data()?.role !== 'admin') {
@@ -52,7 +52,7 @@ export const approveRecharge = functions.https.onCall(async (request) => {
       }
 
       // Actualizar balance del usuario
-      const userRef = db.collection('users').doc(requestData.userId);
+      const userRef = db.collection('USUARIOS').doc(requestData.userId);
       transaction.update(userRef, {
         balance: admin.firestore.FieldValue.increment(requestData.amount)
       });
@@ -100,7 +100,7 @@ export const approveWithdrawal = functions.https.onCall(async (request) => {
     throw new functions.https.HttpsError('unauthenticated', 'No autenticado');
   }
 
-  const adminRef = db.collection('users').doc(request.auth.uid);
+  const adminRef = db.collection('USUARIOS').doc(request.auth.uid);
   const adminDoc = await adminRef.get();
   
   if (!adminDoc.exists || adminDoc.data()?.role !== 'admin') {
@@ -128,7 +128,7 @@ export const approveWithdrawal = functions.https.onCall(async (request) => {
       }
 
       // Verificar balance del usuario
-      const userRef = db.collection('users').doc(requestData.userId);
+      const userRef = db.collection('USUARIOS').doc(requestData.userId);
       const userDoc = await transaction.get(userRef);
       const userData = userDoc.data()!;
 

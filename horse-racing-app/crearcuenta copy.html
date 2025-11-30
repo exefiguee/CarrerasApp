@@ -53,7 +53,7 @@
         }
 
         try {
-          const userDoc = await getDoc(doc(db, "users", user.uid));
+          const userDoc = await getDoc(doc(db, "USUARIOS", user.uid));
           
           if (!userDoc.exists()) {
             alert("❌ Usuario no encontrado en la base de datos");
@@ -114,8 +114,8 @@
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const newUser = userCredential.user;
 
-          // Crear documento en Firestore (colección 'users')
-          await setDoc(doc(db, "users", newUser.uid), {
+          // Crear documento en Firestore (colección 'USUARIOS')
+          await setDoc(doc(db, "USUARIOS", newUser.uid), {
             email: email,
             name: userName,
             balance: initialBalance,
@@ -180,11 +180,11 @@ Ingresá en: https://tuapp.com
 
       // ========== CARGAR USUARIOS ==========
       function loadUsers() {
-        const q = query(collection(db, "users"), orderBy("createdAt", "desc"));
+        const q = query(collection(db, "USUARIOS"), orderBy("createdAt", "desc"));
 
         onSnapshot(q, (snapshot) => {
-          const usersList = document.getElementById("usersList");
-          usersList.innerHTML = "";
+          const USUARIOSList = document.getElementById("USUARIOSList");
+          USUARIOSList.innerHTML = "";
 
           let totalUsers = 0;
           let totalBalance = 0;
@@ -235,7 +235,7 @@ Ingresá en: https://tuapp.com
               </div>
             `;
 
-            usersList.innerHTML += userCard;
+            USUARIOSList.innerHTML += userCard;
           });
 
           // Actualizar stats
@@ -326,7 +326,7 @@ Ingresá en: https://tuapp.com
         if (!amount || isNaN(amount) || Number(amount) <= 0) return;
 
         try {
-          const userRef = doc(db, "users", userId);
+          const userRef = doc(db, "USUARIOS", userId);
           await updateDoc(userRef, {
             balance: increment(Number(amount)),
           });
@@ -342,7 +342,7 @@ Ingresá en: https://tuapp.com
         if (!confirm(`¿Estás seguro de eliminar a ${userEmail}?`)) return;
 
         try {
-          await deleteDoc(doc(db, "users", userId));
+          await deleteDoc(doc(db, "USUARIOS", userId));
           alert("✅ Usuario eliminado");
         } catch (error) {
           console.error("Error:", error);
@@ -468,7 +468,7 @@ Ingresá en: https://tuapp.com
           <!-- Lista de Usuarios -->
           <div class="bg-white rounded-lg shadow-lg p-6">
             <h2 class="text-xl font-bold mb-4">👥 Usuarios Registrados</h2>
-            <div id="usersList" class="space-y-4 max-h-[600px] overflow-y-auto"></div>
+            <div id="USUARIOSList" class="space-y-4 max-h-[600px] overflow-y-auto"></div>
           </div>
 
           <!-- Solicitudes de Recarga -->

@@ -135,13 +135,21 @@ const BetAmount = ({
 
   const totalAmount = calculateTotalAmount(amount);
 
-  const calculateVales = () => {
-    if (!usesVales() || !raceData?.dividendo || raceData.dividendo === 0) {
-      return null;
-    }
-    const vales = totalAmount / raceData.dividendo;
-    return Math.floor(vales);
-  };
+
+const calculateVales = () => {
+  if (!usesVales() || !minBetAmount || minBetAmount === 0) {
+    return null;
+  }
+  
+  console.log("📊 Cálculo de vales:", {
+    amount, // monto por combinación
+    minBetAmount, // rango mínimo permitido
+    resultado: amount / minBetAmount
+  });
+  
+  const vales = amount / minBetAmount;
+  return Math.floor(vales);
+};
 
   const vales = calculateVales();
   const hasVales = vales !== null;
@@ -205,6 +213,7 @@ const BetAmount = ({
 
   // 🔥 FUNCIÓN COMPLETA DE CONFIRMACIÓN CON LOADING Y TICKET
 // 🔥 FUNCIÓN COMPLETA DE CONFIRMACIÓN CON LOADING Y TICKET
+// 🔥 FUNCIÓN COMPLETA DE CONFIRMACIÓN CON LOADING Y TICKET
 const handleConfirm = async () => {
   if (!isAmountValid()) return;
 
@@ -213,8 +222,44 @@ const handleConfirm = async () => {
   try {
     console.log("🎯 Iniciando confirmación de apuesta...");
     
-    // Llamar a la función original de confirmación (que guarda en Firebase)
-    await onConfirm();
+    // 🔥 PREPARAR LOS DATOS COMPLETOS ANTES DE ENVIAR
+    const betData = {
+      // Información básica de la apuesta
+      betType: betTypeConfig.label,
+      betTypeKey: betTypeConfig.originalKey,
+      
+      // Información de la carrera
+      raceNumber: raceData.raceNumber || raceData.num_carrera,
+      venue: raceData.venue || raceData.descripcion_hipodromo,
+      raceDate: raceData.date || raceData.fecha_texto,
+      raceTime: raceData.time || raceData.hora,
+      
+      // Selección de caballos
+      selectedHorses: selectedHorses,
+      horsesArray: horsesArray, // 🔥 IMPORTANTE: pasar el array procesado
+      
+      // Montos
+      amount: amount,
+      totalAmount: totalAmount,
+      combinaciones: combinaciones,
+      
+      // Vales (si aplica)
+      vales: hasVales ? vales : null,
+      dividendo: hasVales ? raceData.dividendo : null,
+      
+      // Usuario
+      userId: user?.uid,
+      userEmail: user?.email,
+      
+      // Metadata
+      timestamp: new Date().toISOString(),
+      status: 'pending',
+    };
+
+    console.log("📦 Datos a enviar:", betData);
+    
+    // Llamar a la función original de confirmación pasándole los datos completos
+    await onConfirm(betData);
     
     console.log("✅ onConfirm ejecutado correctamente");
 
@@ -246,12 +291,12 @@ const handleConfirm = async () => {
     console.log("🎫 Mostrando ticket:", ticket);
     setTicketData(ticket);
     setShowTicket(true);
-    setIsProcessing(false); // 🔥 IMPORTANTE: Detener el loading
+    setIsProcessing(false);
     
   } catch (error) {
     console.error("❌ Error al confirmar apuesta:", error);
-    setIsProcessing(false); // 🔥 Detener loading en caso de error
-    alert("Error al procesar la apuesta. Por favor, intenta de nuevo.");
+    setIsProcessing(false);
+    alert(`Error al procesar la apuesta: ${error.message}`);
   }
 };
 
@@ -608,15 +653,15 @@ const handleConfirm = async () => {
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold">
               $
             </span>
-            <input
-              type="number"
-              value={customAmount}
-              onChange={(e) => handleCustomAmount(e.target.value)}
-              placeholder={`Mínimo ${minBetAmount}`}
-              min={minBetAmount}
-              max={maxBetAmount}
-              className="w-full pl-8 pr-4 py-3 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white font-semibold focus:border-fuchsia-500/50 focus:outline-none transition-colors"
-            />
+           <input
+                      type="number"
+                      value={customAmount}
+                      onChange={(e) => handleCustomAmount(e.target.value)}
+                      placeholder={`Mínimo ${minBetAmount}`}
+                      min={minBetAmount}
+                      max={maxBetAmount}
+                      className="w-full pl-8 pr-4 py-3 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white font-semibold focus:border-fuchsia-500/50 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
           </div>
           <p className="text-slate-500 text-xs">
             Rango permitido: ${minBetAmount.toLocaleString("es-AR")} - $

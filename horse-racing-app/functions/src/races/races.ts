@@ -22,7 +22,7 @@ export const finalizeRace = functions.https.onCall(async (request) => {
   }
 
   // Verificar que es admin
-  const adminRef = db.collection('users').doc(request.auth.uid);
+  const adminRef = db.collection('USUARIOS').doc(request.auth.uid);
   const adminDoc = await adminRef.get();
   
   if (!adminDoc.exists || adminDoc.data()?.role !== 'admin') {
@@ -85,7 +85,7 @@ export const finalizeRace = functions.https.onCall(async (request) => {
         totalWinners++;
 
         // Actualizar balance del usuario
-        const userRef = db.collection('users').doc(betData.userId);
+        const userRef = db.collection('USUARIOS').doc(betData.userId);
         batch.update(userRef, {
           balance: admin.firestore.FieldValue.increment(payout),
           totalWon: admin.firestore.FieldValue.increment(payout - betData.amount)
@@ -114,7 +114,7 @@ export const finalizeRace = functions.https.onCall(async (request) => {
         totalLosers++;
         
         // Actualizar estadísticas del usuario
-        const userRef = db.collection('users').doc(betData.userId);
+        const userRef = db.collection('USUARIOS').doc(betData.userId);
         batch.update(userRef, {
           totalLost: admin.firestore.FieldValue.increment(betData.amount)
         });

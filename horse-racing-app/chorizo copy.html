@@ -51,7 +51,7 @@
           
           try {
             // Verificar si es admin
-            const userDoc = await getDoc(doc(db, "users", user.uid));
+            const userDoc = await getDoc(doc(db, "USUARIOS", user.uid));
             
             if (userDoc.exists() && userDoc.data().role === "admin") {
               console.log("🔑 Redirigiendo a panel admin...");
@@ -132,7 +132,7 @@
           console.log("✅ Login exitoso:", user.email);
           
           // Verificar si es admin
-          const userDoc = await getDoc(doc(db, "users", user.uid));
+          const userDoc = await getDoc(doc(db, "USUARIOS", user.uid));
           
           if (userDoc.exists() && userDoc.data().role === "admin") {
             console.log("🔑 Redirigiendo a panel admin...");

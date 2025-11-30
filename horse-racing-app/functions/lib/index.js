@@ -33,71 +33,92 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.finalizeRace = exports.approveWithdrawal = exports.approveRecharge = exports.cancelBet = exports.createBet = exports.adminCreateUser = void 0;
+exports.getUserStats = exports.healthCheck = exports.adminCreateUser = exports.finalizeRace = exports.approveWithdrawal = exports.approveRecharge = exports.cancelBet = exports.createBet = void 0;
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions"));
-// Importar módulos
-const bets_1 = require("./bets");
+// ========================================
+// 🔥 INICIALIZAR FIREBASE ADMIN (UNA SOLA VEZ)
+// ========================================
+admin.initializeApp();
+// ========================================
+// 🔥 EXPORTAR MÓDULOS
+// ========================================
+// Apuestas
+var bets_1 = require("./bets");
 Object.defineProperty(exports, "createBet", { enumerable: true, get: function () { return bets_1.createBet; } });
 Object.defineProperty(exports, "cancelBet", { enumerable: true, get: function () { return bets_1.cancelBet; } });
-const transactions_1 = require("./transactions");
+// Transacciones (Admin)
+var transactions_1 = require("./transactions");
 Object.defineProperty(exports, "approveRecharge", { enumerable: true, get: function () { return transactions_1.approveRecharge; } });
 Object.defineProperty(exports, "approveWithdrawal", { enumerable: true, get: function () { return transactions_1.approveWithdrawal; } });
-const races_1 = require("./races");
+// Carreras (Admin)
+var races_1 = require("./races");
 Object.defineProperty(exports, "finalizeRace", { enumerable: true, get: function () { return races_1.finalizeRace; } });
-// Inicializar Firebase Admin
-admin.initializeApp();
-// ========== CREAR USUARIO (Solo Admin) ==========
-exports.adminCreateUser = functions.https.onCall(async (request) => {
-    var _a;
-    // Verificar autenticación
+// Admin
+var admin_1 = require("./admin");
+Object.defineProperty(exports, "adminCreateUser", { enumerable: true, get: function () { return admin_1.adminCreateUser; } });
+// ========================================
+// 🔥 FUNCIÓN DE HEALTH CHECK
+// ========================================
+exports.healthCheck = functions.https.onRequest((req, res) => {
+    res.status(200).send({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        version: '2.0',
+        message: 'Horse Racing API is running! 🐎',
+    });
+});
+// ========================================
+// 🔥 FUNCIÓN PARA OBTENER ESTADÍSTICAS
+// ========================================
+exports.getUserStats = functions.https.onCall(async (request) => {
     if (!request.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'No autenticado');
     }
     const db = admin.firestore();
-    // Verificar que es admin
-    const adminRef = db.collection('users').doc(request.auth.uid);
-    const adminDoc = await adminRef.get();
-    if (!adminDoc.exists || ((_a = adminDoc.data()) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
-        throw new functions.https.HttpsError('permission-denied', 'Solo administradores pueden crear usuarios');
-    }
-    const { email, password, name, initialBalance } = request.data;
-    if (!email || !password || !name) {
-        throw new functions.https.HttpsError('invalid-argument', 'Faltan datos requeridos');
-    }
+    const userId = request.auth.uid;
+    console.log("🔥 Obteniendo estadísticas de:", userId);
     try {
-        // Crear usuario en Authentication
-        const userRecord = await admin.auth().createUser({
-            email,
-            password,
-            displayName: name,
+        // Obtener todas las apuestas del usuario
+        const betsSnapshot = await db.collection('bets')
+            .where('userId', '==', userId)
+            .get();
+        let totalBets = 0;
+        let totalWon = 0;
+        let totalLost = 0;
+        let pendingBets = 0;
+        let wonBets = 0;
+        let lostBets = 0;
+        betsSnapshot.forEach(doc => {
+            const bet = doc.data();
+            totalBets++;
+            if (bet.status === 'pending') {
+                pendingBets++;
+            }
+            else if (bet.status === 'won') {
+                wonBets++;
+                totalWon += bet.payout || 0;
+            }
+            else if (bet.status === 'lost') {
+                lostBets++;
+                totalLost += bet.amount || 0;
+            }
         });
-        // Crear documento en Firestore
-        await db.collection('users').doc(userRecord.uid).set({
-            email,
-            name,
-            balance: initialBalance || 0,
-            role: 'user',
-            totalBet: 0,
-            totalWon: 0,
-            totalLost: 0,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            createdBy: request.auth.uid,
-        });
-        return {
-            success: true,
-            userId: userRecord.uid,
-            email,
-            name,
-            password, // Devolver password para que el admin lo envíe
-            initialBalance: initialBalance || 0,
+        const stats = {
+            totalBets,
+            pendingBets,
+            wonBets,
+            lostBets,
+            totalWon,
+            totalLost,
+            netProfit: totalWon - totalLost,
+            winRate: totalBets > 0 ? (wonBets / totalBets) * 100 : 0,
         };
+        console.log("✅ Estadísticas:", stats);
+        return stats;
     }
     catch (error) {
-        console.error('Error creando usuario:', error);
-        if (error.code === 'auth/email-already-exists') {
-            throw new functions.https.HttpsError('already-exists', 'El email ya está registrado');
-        }
+        console.error("❌ Error:", error);
         throw new functions.https.HttpsError('internal', error.message);
     }
 });

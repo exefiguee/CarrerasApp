@@ -71,8 +71,8 @@ function CreateUser() {
       );
       const user = userCredential.user;
 
-      // Crear documento en Firestore en la colección "users"
-      await setDoc(doc(db, "users", user.uid), {
+      // Crear documento en Firestore en la colección "USUARIOS"
+      await setDoc(doc(db, "USUARIOS", user.uid), {
         email: email,
         name: name,
         balance: parseFloat(initialBalance) || 0,

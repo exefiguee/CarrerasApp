@@ -36,9 +36,9 @@ function App() {
       setLoading(false);
       
       if (currentUser) {
-        // ✅ Escuchar desde la colección "users" (minúsculas)
+        // ✅ Escuchar desde la colección "USUARIOS" (minúsculas)
         const unsubscribeUserData = onSnapshot(
-          doc(db, "users", currentUser.uid),
+          doc(db, "USUARIOS", currentUser.uid),
           (docSnap) => {
             if (docSnap.exists()) {
               const data = docSnap.data();
@@ -62,7 +62,7 @@ function App() {
                 role: data.role
               });
             } else {
-              console.warn("⚠️ Usuario no encontrado en colección 'users'");
+              console.warn("⚠️ Usuario no encontrado en colección 'USUARIOS'");
               setUserData(null);
             }
           },
@@ -129,13 +129,236 @@ function App() {
     }
   };
 
-  const handleConfirmBet = async () => {
-    if (!user) {
-      alert("Debes iniciar sesión para apostar");
-      return;
-    }
-  };
+// // 🔥 FUNCIÓN MEJORADA Y CORREGIDA
+// const handleConfirmBet = async () => {
+//   console.log("✅ Confirmando apuesta con datos completos...");
 
+//   try {
+//     const config = betTypes[betType];
+
+//     // 🎯 Preparar información de caballos según el tipo de apuesta
+//     let caballosData = [];
+//     let caballosInfo = {};
+
+//     // 🔥 APUESTAS MULTI-CARRERA (DOBLE, TRIPLO, PICK)
+//     if (config.selectionMode === "grouped-races" || selectedHorses?.multiRace) {
+//       const numRaces = config?.races || 2;
+      
+//       for (let i = 1; i <= numRaces; i++) {
+//         const raceKey = `race${i}`;
+//         const raceHorses = selectedHorses[raceKey] || [];
+//         const raceInfo = selectedHorses[`${raceKey}Info`];
+
+//         // ✅ ASEGURAR QUE CADA CABALLO TENGA TODOS LOS CAMPOS
+//         const processedHorses = raceHorses.map(h => ({
+//           numero: parseInt(h.number) || parseInt(h.numero) || 0,
+//           number: parseInt(h.number) || parseInt(h.numero) || 0,
+//           nombre: h.name || h.nombre || `Caballo ${h.number || h.numero}`,
+//           name: h.name || h.nombre || `Caballo ${h.number || h.numero}`,
+//           jockey: h.jockey || "",
+//           noCorre: h.noCorre || h.scratched || false,
+//           scratched: h.noCorre || h.scratched || false
+//         }));
+
+//         caballosInfo[raceKey] = {
+//           caballos: processedHorses,
+//           carrera: raceInfo ? {
+//             numero: raceInfo.number || 0,
+//             hipodromo: raceInfo.venue || "",
+//             fecha: raceInfo.date || "",
+//             hora: raceInfo.time || ""
+//           } : null
+//         };
+
+//         caballosData.push(...processedHorses);
+//       }
+//     }
+//     // 🔥 APUESTAS AGRUPADAS POR POSICIÓN (EXACTA, IMPERFECTA, TRIFECTA D, CUATRIFECTA D)
+//     else if (config.selectionMode === "grouped-positions" && selectedHorses?.grouped) {
+//       const positions = config?.positions || 2;
+      
+//       for (let i = 1; i <= positions; i++) {
+//         const positionKey = `position${i}`;
+//         const positionHorses = selectedHorses[positionKey] || [];
+
+//         // ✅ PROCESAR CADA CABALLO
+//         const processedHorses = positionHorses.map(h => ({
+//           numero: parseInt(h.number) || parseInt(h.numero) || 0,
+//           number: parseInt(h.number) || parseInt(h.numero) || 0,
+//           nombre: h.name || h.nombre || `Caballo ${h.number || h.numero}`,
+//           name: h.name || h.nombre || `Caballo ${h.number || h.numero}`,
+//           jockey: h.jockey || ""
+//         }));
+
+//         caballosInfo[positionKey] = processedHorses;
+//         caballosData.push(...processedHorses);
+//       }
+//     }
+//     // 🔥 APUESTAS NORMALES (ARRAY)
+//     else {
+//       const horsesArray = Array.isArray(selectedHorses) ? selectedHorses : [];
+//       caballosData = horsesArray.map(h => ({
+//         numero: parseInt(h.number) || parseInt(h.numero) || 0,
+//         number: parseInt(h.number) || parseInt(h.numero) || 0,
+//         nombre: h.name || h.nombre || `Caballo ${h.number || h.numero}`,
+//         name: h.name || h.nombre || `Caballo ${h.number || h.numero}`,
+//         jockey: h.jockey || "",
+//         noCorre: h.noCorre || h.scratched || false,
+//         scratched: h.noCorre || h.scratched || false
+//       }));
+//     }
+
+//     // 🎯 Calcular combinaciones finales
+//     const calculateFinalCombinations = () => {
+//       if (config.selectionMode === "grouped-races" || selectedHorses?.multiRace) {
+//         const numRaces = config?.races || 2;
+//         let total = 1;
+//         for (let i = 1; i <= numRaces; i++) {
+//           const raceHorses = selectedHorses[`race${i}`] || [];
+//           const validHorses = raceHorses.filter(h => !h.noCorre && !h.scratched);
+//           total *= validHorses.length;
+//         }
+//         return total;
+//       }
+
+//       if (config.selectionMode === "grouped-positions" && selectedHorses?.grouped) {
+//         const positions = config?.positions || 2;
+//         let total = 1;
+//         for (let i = 1; i <= positions; i++) {
+//           const count = selectedHorses[`position${i}`]?.length || 0;
+//           total *= count;
+//         }
+//         return total;
+//       }
+
+//       const n = caballosData.length;
+//       if (config.type === "tira") return 3;
+//       if (config.selectionMode === "single") return 1;
+//       if (config.selectionMode === "ordered-direct") return 1;
+      
+//       if (config.selectionMode === "ordered-combination") {
+//         const positions = config?.positions || 3;
+//         if (n < positions) return 0;
+//         return factorial(n) / factorial(n - positions);
+//       }
+
+//       return 1;
+//     };
+
+//     const combinacionesFinales = calculateFinalCombinations();
+//     const montoTotal = amount * combinacionesFinales;
+
+//     // 🎯 Calcular vales (si aplica)
+//     const dividendo = currentRaceData?.dividendo || 0;
+//     let valesApostados = 0;
+    
+//     const excludedTypes = ["ganador", "segundo", "tercero", "tira(1,2,3)"];
+//     const normalizedType = config?.originalKey?.toLowerCase().trim();
+//     const usesVales = !excludedTypes.includes(normalizedType);
+
+//     if (usesVales && dividendo > 0) {
+//       valesApostados = Math.floor(montoTotal / dividendo);
+//     }
+
+//     // 🔥 OBJETO COMPLETO DE LA APUESTA - SIN CAMPOS UNDEFINED
+//     const betData = {
+//       // IDs - SIEMPRE CON VALORES
+//       hipodromoId: currentRaceData.firebaseId || currentRaceData.id || "",
+//       hipodromoNombre: currentRaceData.venue || currentRaceData.descripcion_hipodromo || "Hipódromo",
+//       carreraId: currentRaceData.firebaseId || currentRaceData.id || "",
+//       numeroCarrera: parseInt(currentRaceData.raceNumber || currentRaceData.num_carrera || 0),
+      
+//       // Fecha y hora - SIEMPRE CON VALORES
+//       fecha: currentRaceData.date || currentRaceData.fecha_texto || new Date().toISOString().split('T')[0],
+//       hora: currentRaceData.time || currentRaceData.hora || "00:00",
+      
+//       // Tipo de apuesta - SIEMPRE CON VALORES
+//       betType: config.originalKey || betType || "GANADOR",
+//       betTypeLabel: config.label || betType || "GANADOR",
+//       betTypeDescription: config.description || "",
+//       selectionMode: config.selectionMode || "single",
+      
+//       // Flags booleanos
+//       isGroupedPositions: config.selectionMode === "grouped-positions",
+//       isGroupedRaces: config.selectionMode === "grouped-races",
+//       isMultiRace: selectedHorses?.multiRace || false,
+      
+//       // Caballos - ARRAY LIMPIO
+//       selectedHorses: caballosData,
+//       caballosInfo: Object.keys(caballosInfo).length > 0 ? caballosInfo : null,
+      
+//       // Montos - SIEMPRE NÚMEROS
+//       amount: parseFloat(amount) || 0,
+//       combinaciones: parseInt(combinacionesFinales) || 1,
+//       montoTotal: parseFloat(montoTotal) || 0,
+//       potentialWin: parseFloat(montoTotal * (config.multiplier || 2)) || 0,
+      
+//       // Vales
+//       dividendo: parseFloat(dividendo) || 0,
+//       valesApostados: parseInt(valesApostados) || 0,
+//       usesVales: usesVales,
+      
+//       // Límites
+//       apuestaMinima: parseFloat(config.apuestaMinima) || 200,
+//       apuestaMaxima: parseFloat(config.apuestaMaxima) || 50000,
+      
+//       // Timestamps
+//       timestamp: Date.now(),
+//       fechaCreacion: new Date().toISOString(),
+      
+//       // Usuario
+//       userId: user?.uid || user?.id || "",
+//       userEmail: user?.email || "",
+      
+//       // Estado
+//       estado: "PENDIENTE",
+      
+//       // Metadata de carrera
+//       raceMetadata: {
+//         totalHorses: parseInt(currentRaceData.horses?.length) || 0,
+//         distance: currentRaceData.distance || currentRaceData.distancia || "",
+//         type: currentRaceData.type || currentRaceData.tipo || "",
+//         prize: currentRaceData.prize || currentRaceData.premio || "",
+//       }
+//     };
+
+//     console.log("🔥 Datos COMPLETOS y LIMPIOS de la apuesta:", betData);
+
+//     // 🎯 Validar antes de enviar
+//     const validation = betService.validateBet(betData, userSaldo);
+//     if (!validation.isValid) {
+//       alert("❌ Error en la apuesta:\n" + validation.errors.join("\n"));
+//       return;
+//     }
+
+//     // 🔥 Crear la apuesta en Firebase via Cloud Function
+//     const result = await betService.createBet(user.uid, betData, userSaldo);
+
+//     if (result.success) {
+//       console.log("✅ Apuesta creada exitosamente:", result.apuestaId);
+      
+//       // 🎯 Llamar al callback PERO NO CERRAR
+//       if (onConfirmBet) {
+//         onConfirmBet(result);
+//       }
+      
+//       // 🚫 NO LLAMAR onClose() - dejar que BetAmount muestre el ticket
+      
+//     } else {
+//       console.error("❌ Error al crear apuesta:", result.error);
+//       alert("❌ Error al crear la apuesta: " + result.error);
+//     }
+
+//   } catch (error) {
+//     console.error("❌ Error en handleConfirmBet:", error);
+//     alert("❌ Error al confirmar la apuesta: " + error.message);
+//   }
+// };
+// 🔥 EN App.jsx - VERSIÓN SIMPLIFICADA
+const handleConfirmBet = (result) => {
+  console.log("✅ Apuesta confirmada:", result);
+  // Ya está, no hacemos nada más
+};
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError("");
@@ -270,20 +493,10 @@ function App() {
                 </div>
                 
                 {/* 🆕 Botón Ver Todas las Apuestas - Desktop */}
-                <button
-                  onClick={() => setShowAllBetsModal(true)}
-                  className="p-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 backdrop-blur-sm border border-blue-500/40 text-white transition-all shadow-lg shadow-blue-500/20 hover:scale-105"
-                  title="Ver Todas las Apuestas">
-                  <List className="w-5 h-5" />
-                </button>
+            
 
                 {/* Botón Crear Usuario - Desktop */}
-                <button
-                  onClick={() => setShowCreateUserModal(true)}
-                  className="p-2.5 rounded-xl bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 backdrop-blur-sm border border-green-500/40 text-white transition-all shadow-lg shadow-green-500/20 hover:scale-105"
-                  title="Crear Usuario">
-                  <UserPlus className="w-5 h-5" />
-                </button>
+         
               </div>
 
               {user ? (
@@ -569,7 +782,7 @@ function App() {
             <div className="flex flex-col items-center text-center mb-5">
               <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg shadow-fuchsia-500/20 mb-3 border border-fuchsia-400/20">
                 <img
-                  src="/logo.png"
+                  src={logoCaballo}
                   alt="Racing System Logo"
                   className="w-10 h-10 object-contain"
                 />
@@ -671,16 +884,30 @@ function App() {
         </div>
       )}
 
-      {/* Bet Modal */}
-      {selectedRace && (
-        <BetModal
-          race={selectedRace}
-          onClose={() => setSelectedRace(null)}
-          onConfirmBet={handleConfirmBet}
-          user={user}
-          userSaldo={userData?.SALDO || 0}
-        />
-      )}
+     {/* Bet Modal */}
+{selectedRace && (
+  <BetModal
+    race={selectedRace}
+    onClose={() => {
+      setSelectedRace(null);
+      // 🔥 Opcional: Refrescar datos del usuario después de cerrar
+      // fetchUserData();
+    }}
+    onConfirmBet={(result) => {
+      console.log("✅ Apuesta confirmada:", result);
+      // 🔥 Actualizar saldo si viene en el resultado
+      if (result.newBalance !== undefined) {
+        // Actualizar userData con el nuevo saldo
+        setUserData(prev => ({
+          ...prev,
+          SALDO: result.newBalance
+        }));
+      }
+    }}
+    user={user}
+    userSaldo={userData?.SALDO || 0}
+  />
+)}
     </div>
   );
 }

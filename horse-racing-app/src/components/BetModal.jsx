@@ -296,196 +296,207 @@ const BetModal = ({ race, onClose, onConfirmBet, user, userSaldo }) => {
  // 🔥 FUNCIÓN MEJORADA en BetModal.jsx - Reemplaza tu handleConfirmBet actual
 
 
-const handleConfirmBet = async () => {
-  console.log("✅ Confirmando apuesta con datos completos...");
+  const handleConfirmBet = async () => {
+    console.log("✅ Confirmando apuesta...");
 
-  try {
-    // 🎯 Preparar información de caballos según el tipo de apuesta
-    let caballosData = [];
-    let caballosInfo = {};
-
-    const config = betTypes[betType];
-
-    // 🔥 APUESTAS MULTI-CARRERA (DOBLE, TRIPLO, PICK)
-    if (config.selectionMode === "grouped-races" || selectedHorses?.multiRace) {
-      const numRaces = config?.races || 2;
+    try {
+      const config = betTypes[betType]; // ✅ Ahora SÍ tiene acceso
       
-      for (let i = 1; i <= numRaces; i++) {
-        const raceKey = `race${i}`;
-        const raceHorses = selectedHorses[raceKey] || [];
-        const raceInfo = selectedHorses[`${raceKey}Info`];
-
-        caballosInfo[raceKey] = {
-          caballos: raceHorses.map(h => ({
-            numero: h.number,
-            nombre: h.name,
-            jockey: h.jockey || "",
-            noCorre: h.noCorre || false,
-            scratched: h.scratched || false
-          })),
-          carrera: raceInfo ? {
-            numero: raceInfo.number,
-            hipodromo: raceInfo.venue,
-            fecha: raceInfo.date,
-            hora: raceInfo.time
-          } : null
-        };
-
-        caballosData.push(...raceHorses);
+      if (!config) {
+        console.error("❌ No se encontró la configuración del tipo de apuesta");
+        alert("Error: Configuración de apuesta no encontrada");
+        return;
       }
-    }
-    // 🔥 APUESTAS AGRUPADAS POR POSICIÓN (EXACTA, IMPERFECTA, TRIFECTA D, CUATRIFECTA D)
-    else if (config.selectionMode === "grouped-positions" && selectedHorses?.grouped) {
-      const positions = config?.positions || 2;
-      
-      for (let i = 1; i <= positions; i++) {
-        const positionKey = `position${i}`;
-        const positionHorses = selectedHorses[positionKey] || [];
 
-        caballosInfo[positionKey] = positionHorses.map(h => ({
-          numero: h.number,
-          nombre: h.name,
-          jockey: h.jockey || ""
-        }));
+      // Preparar caballos
+      let caballosData = [];
+      let caballosInfo = {};
 
-        caballosData.push(...positionHorses);
-      }
-    }
-    // 🔥 APUESTAS NORMALES (ARRAY)
-    else {
-      caballosData = Array.isArray(selectedHorses) ? selectedHorses : [];
-    }
-
-    // 🎯 Calcular combinaciones finales
-    const calculateFinalCombinations = () => {
+      // MULTI-CARRERA
       if (config.selectionMode === "grouped-races" || selectedHorses?.multiRace) {
         const numRaces = config?.races || 2;
-        let total = 1;
+        
         for (let i = 1; i <= numRaces; i++) {
-          const raceHorses = selectedHorses[`race${i}`] || [];
-          const validHorses = raceHorses.filter(h => !h.noCorre && !h.scratched);
-          total *= validHorses.length;
-        }
-        return total;
-      }
+          const raceKey = `race${i}`;
+          const raceHorses = selectedHorses[raceKey] || [];
+          const raceInfo = selectedHorses[`${raceKey}Info`];
 
-      if (config.selectionMode === "grouped-positions" && selectedHorses?.grouped) {
+          const processedHorses = raceHorses.map(h => ({
+            numero: parseInt(h.number) || parseInt(h.numero) || 0,
+            number: parseInt(h.number) || parseInt(h.numero) || 0,
+            nombre: h.name || h.nombre || `Caballo ${h.number || h.numero}`,
+            name: h.name || h.nombre || `Caballo ${h.number || h.numero}`,
+            jockey: h.jockey || "",
+            noCorre: h.noCorre || h.scratched || false,
+            scratched: h.noCorre || h.scratched || false
+          }));
+
+          caballosInfo[raceKey] = {
+            caballos: processedHorses,
+            carrera: raceInfo ? {
+              numero: raceInfo.number || 0,
+              hipodromo: raceInfo.venue || "",
+              fecha: raceInfo.date || "",
+              hora: raceInfo.time || ""
+            } : null
+          };
+
+          caballosData.push(...processedHorses);
+        }
+      }
+      // AGRUPADAS POR POSICIÓN
+      else if (config.selectionMode === "grouped-positions" && selectedHorses?.grouped) {
         const positions = config?.positions || 2;
-        let total = 1;
+        
         for (let i = 1; i <= positions; i++) {
-          const count = selectedHorses[`position${i}`]?.length || 0;
-          total *= count;
+          const positionKey = `position${i}`;
+          const positionHorses = selectedHorses[positionKey] || [];
+
+          const processedHorses = positionHorses.map(h => ({
+            numero: parseInt(h.number) || parseInt(h.numero) || 0,
+            number: parseInt(h.number) || parseInt(h.numero) || 0,
+            nombre: h.name || h.nombre || `Caballo ${h.number || h.numero}`,
+            name: h.name || h.nombre || `Caballo ${h.number || h.numero}`,
+            jockey: h.jockey || ""
+          }));
+
+          caballosInfo[positionKey] = processedHorses;
+          caballosData.push(...processedHorses);
         }
-        return total;
+      }
+      // NORMALES
+      else {
+        const horsesArray = Array.isArray(selectedHorses) ? selectedHorses : [];
+        caballosData = horsesArray.map(h => ({
+          numero: parseInt(h.number) || parseInt(h.numero) || 0,
+          number: parseInt(h.number) || parseInt(h.numero) || 0,
+          nombre: h.name || h.nombre || `Caballo ${h.number || h.numero}`,
+          name: h.name || h.nombre || `Caballo ${h.number || h.numero}`,
+          jockey: h.jockey || "",
+          noCorre: h.noCorre || h.scratched || false,
+          scratched: h.noCorre || h.scratched || false
+        }));
       }
 
-      const n = caballosData.length;
-      if (config.type === "tira") return 3;
-      if (config.selectionMode === "single") return 1;
-      if (config.selectionMode === "ordered-direct") return 1;
+      // Calcular combinaciones
+      const calculateFinalCombinations = () => {
+        if (config.selectionMode === "grouped-races" || selectedHorses?.multiRace) {
+          const numRaces = config?.races || 2;
+          let total = 1;
+          for (let i = 1; i <= numRaces; i++) {
+            const raceHorses = selectedHorses[`race${i}`] || [];
+            const validHorses = raceHorses.filter(h => !h.noCorre && !h.scratched);
+            total *= validHorses.length || 1;
+          }
+          return total;
+        }
+
+        if (config.selectionMode === "grouped-positions" && selectedHorses?.grouped) {
+          const positions = config?.positions || 2;
+          let total = 1;
+          for (let i = 1; i <= positions; i++) {
+            const count = selectedHorses[`position${i}`]?.length || 0;
+            total *= count || 1;
+          }
+          return total;
+        }
+
+        const n = caballosData.length;
+        if (config.type === "tira") return 3;
+        if (config.selectionMode === "single") return 1;
+        if (config.selectionMode === "ordered-direct") return 1;
+        
+        if (config.selectionMode === "ordered-combination") {
+          const positions = config?.positions || 3;
+          if (n < positions) return 0;
+          return factorial(n) / factorial(n - positions);
+        }
+
+        return 1;
+      };
+
+      const combinacionesFinales = calculateFinalCombinations();
+      const montoTotal = amount * combinacionesFinales;
+
+      // Calcular vales
+      const dividendo = currentRaceData?.dividendo || 0;
+      let valesApostados = 0;
       
-      if (config.selectionMode === "ordered-combination") {
-        const positions = config?.positions || 3;
-        if (n < positions) return 0;
-        return factorial(n) / factorial(n - positions);
+      const excludedTypes = ["ganador", "segundo", "tercero", "tira(1,2,3)"];
+      const normalizedType = config?.originalKey?.toLowerCase().trim();
+      const usesVales = !excludedTypes.includes(normalizedType);
+
+      if (usesVales && dividendo > 0) {
+        valesApostados = Math.floor(montoTotal / dividendo);
       }
 
-      return 1;
-    };
+      // Datos de la apuesta
+      const betData = {
+        hipodromoId: currentRaceData.firebaseId || currentRaceData.id || "",
+        hipodromoNombre: currentRaceData.venue || currentRaceData.descripcion_hipodromo || "Hipódromo",
+        carreraId: currentRaceData.firebaseId || currentRaceData.id || "",
+        numeroCarrera: parseInt(currentRaceData.raceNumber || currentRaceData.num_carrera || 0),
+        fecha: currentRaceData.date || currentRaceData.fecha_texto || new Date().toISOString().split('T')[0],
+        hora: currentRaceData.time || currentRaceData.hora || "00:00",
+        betType: config.originalKey || betType || "GANADOR",
+        betTypeLabel: config.label || betType || "GANADOR",
+        betTypeDescription: config.description || "",
+        selectionMode: config.selectionMode || "single",
+        isGroupedPositions: config.selectionMode === "grouped-positions",
+        isGroupedRaces: config.selectionMode === "grouped-races",
+        isMultiRace: selectedHorses?.multiRace || false,
+        selectedHorses: caballosData,
+        caballosInfo: Object.keys(caballosInfo).length > 0 ? caballosInfo : null,
+        amount: parseFloat(amount) || 0,
+        combinaciones: parseInt(combinacionesFinales) || 1,
+        montoTotal: parseFloat(montoTotal) || 0,
+        potentialWin: parseFloat(montoTotal * 2) || 0,
+        dividendo: parseFloat(dividendo) || 0,
+        valesApostados: parseInt(valesApostados) || 0,
+        usesVales: usesVales,
+        apuestaMinima: parseFloat(config.apuestaMinima) || 200,
+        apuestaMaxima: parseFloat(config.apuestaMaxima) || 50000,
+        timestamp: Date.now(),
+        fechaCreacion: new Date().toISOString(),
+        userId: user?.uid || user?.id || "",
+        userEmail: user?.email || "",
+        estado: "PENDIENTE",
+        raceMetadata: {
+          totalHorses: parseInt(currentRaceData.horses?.length) || 0,
+          distance: currentRaceData.distance || currentRaceData.distancia || "",
+          type: currentRaceData.type || currentRaceData.tipo || "",
+          prize: currentRaceData.prize || currentRaceData.premio || "",
+        }
+      };
 
-    const combinacionesFinales = calculateFinalCombinations();
-    const montoTotal = amount * combinacionesFinales;
+      console.log("🔥 Enviando apuesta:", betData);
 
-    // 🎯 Calcular vales (si aplica)
-    const dividendo = currentRaceData?.dividendo || 0;
-    let valesApostados = 0;
-    
-    const excludedTypes = ["ganador", "segundo", "tercero"];
-    const normalizedType = config?.originalKey?.toLowerCase().trim();
-    const usesVales = !excludedTypes.includes(normalizedType);
+      // Validar
+      const validation = betService.validateBet(betData, userSaldo);
+      if (!validation.isValid) {
+        alert("❌ " + validation.errors.join("\n"));
+        return;
+      }
 
-    if (usesVales && dividendo > 0) {
-      valesApostados = Math.floor(montoTotal / dividendo);
+      // Crear apuesta
+      const result = await betService.createBet(user.uid, betData, userSaldo);
+
+      if (result.success) {
+        console.log("✅ Apuesta creada:", result.apuestaId);
+        
+        if (onConfirmBet) {
+          onConfirmBet(result);
+        }
+        
+      } else {
+        alert("❌ " + result.error);
+      }
+
+    } catch (error) {
+      console.error("❌ Error:", error);
+      alert("❌ " + error.message);
     }
-
-    // 🔥 OBJETO COMPLETO DE LA APUESTA
-    const betData = {
-      hipodromoId: currentRaceData.firebaseId || currentRaceData.id || "",
-      hipodromoNombre: currentRaceData.venue || currentRaceData.descripcion_hipodromo || "",
-      carreraId: currentRaceData.firebaseId || currentRaceData.id || "",
-      numeroCarrera: parseInt(currentRaceData.raceNumber || currentRaceData.num_carrera || 0),
-      fecha: currentRaceData.date || currentRaceData.fecha_texto || new Date().toISOString().split('T')[0],
-      hora: currentRaceData.time || currentRaceData.hora || "",
-      betType: config.originalKey || betType,
-      betTypeLabel: config.label || betType,
-      betTypeDescription: config.description || "",
-      selectionMode: config.selectionMode,
-      isGroupedPositions: config.selectionMode === "grouped-positions",
-      isGroupedRaces: config.selectionMode === "grouped-races",
-      isMultiRace: selectedHorses?.multiRace || false,
-      selectedHorses: caballosData.map(h => ({
-        numero: h.number,
-        nombre: h.name,
-        jockey: h.jockey || "",
-        noCorre: h.noCorre || false,
-        scratched: h.scratched || false
-      })),
-      caballosInfo: Object.keys(caballosInfo).length > 0 ? caballosInfo : null,
-      amount: amount,
-      combinaciones: combinacionesFinales,
-      montoTotal: montoTotal,
-      potentialWin: montoTotal * (config.multiplier || 2),
-      dividendo: dividendo,
-      valesApostados: valesApostados,
-      usesVales: usesVales,
-      apuestaMinima: config.apuestaMinima || 200,
-      apuestaMaxima: config.apuestaMaxima || 50000,
-      timestamp: Date.now(),
-      fechaCreacion: new Date().toISOString(),
-      userId: user?.uid || user?.id || "",
-      userEmail: user?.email || "",
-      estado: "PENDIENTE",
-      raceMetadata: {
-        totalHorses: currentRaceData.horses?.length || 0,
-        distance: currentRaceData.distance || currentRaceData.distancia || "",
-        type: currentRaceData.type || currentRaceData.tipo || "",
-        prize: currentRaceData.prize || currentRaceData.premio || "",
-      }
-    };
-
-    console.log("🔥 Datos COMPLETOS de la apuesta:", betData);
-
-    // 🎯 Validar antes de enviar
-    const validation = betService.validateBet(betData, userSaldo);
-    if (!validation.isValid) {
-      alert("❌ Error en la apuesta:\n" + validation.errors.join("\n"));
-      return;
-    }
-
-    // 🔥 Crear la apuesta en Firebase
-    const result = await betService.createBet(user.uid, betData, userSaldo);
-
-    if (result.success) {
-      console.log("✅ Apuesta creada exitosamente:", result.apuestaId);
-      
-      // 🎯 Llamar al callback PERO NO CERRAR
-      if (onConfirmBet) {
-        onConfirmBet(result);
-      }
-      
-      // 🚫 NO LLAMAR onClose() - dejar que BetAmount muestre el ticket
-      // onClose(); // <--- COMENTADO
-      
-    } else {
-      console.error("❌ Error al crear apuesta:", result.error);
-      alert("❌ Error al crear la apuesta: " + result.error);
-    }
-
-  } catch (error) {
-    console.error("❌ Error en handleConfirmBet:", error);
-    alert("❌ Error al confirmar la apuesta: " + error.message);
-  }
-};
+  };
 // 🔧 Función auxiliar para calcular factorial (si no existe ya en tu componente)
 const factorial = (n) => {
   if (n <= 1) return 1;
@@ -663,24 +674,24 @@ const factorial = (n) => {
                 />
               )}
 
-          {step === 3 && (
-                <BetAmount
-                  betType={betType}
-                  selectedHorses={selectedHorses}
-                  amount={amount}
-                  onAmountChange={setAmount}
-                  onBack={() => setStep(2)}
-                  onConfirm={handleConfirmBet}
-                  canProceed={canProceed()}
-                  raceData={currentRaceData}
-                  user={user}
-                  userSaldo={userSaldo}
-                  maxBetAmount={betTypes[betType]?.apuestaMaxima}
-                  minBetAmount={betTypes[betType]?.apuestaMinima}
-                  betTypeConfig={betTypes[betType]}
-                  onClose={onClose} // 🔥 AGREGAR ESTA LÍNEA
-                />
-              )}
+         {step === 3 && (
+  <BetAmount
+    betType={betType}
+    selectedHorses={selectedHorses}
+    amount={amount}
+    onAmountChange={setAmount}
+    onBack={() => setStep(2)}
+    onConfirm={handleConfirmBet}
+    canProceed={canProceed()}
+    raceData={currentRaceData}
+    user={user}
+    userSaldo={userSaldo}
+    maxBetAmount={betTypes[betType]?.apuestaMaxima}
+    minBetAmount={betTypes[betType]?.apuestaMinima}
+    betTypeConfig={betTypes[betType]}
+    onClose={onClose}
+  />
+)}  
             </>
           )}
         </div>

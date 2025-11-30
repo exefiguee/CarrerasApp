@@ -412,6 +412,7 @@ function AllBets() {
       </div>
     </div>
   );
+  
 }
 
 export default AllBets;
